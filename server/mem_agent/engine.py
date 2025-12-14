@@ -300,8 +300,8 @@ def execute_sandboxed_code(
     if result.returncode != 0:
         return None, result.stderr.decode().strip()
 
-    print("stderr:", result.stderr.decode())
-    print("stdout:", result.stdout[:200])
+    # print("stderr:", result.stderr.decode())
+    # print("stdout:", result.stdout[:200])
     
     try:
         local_vars, error_msg = pickle.loads(result.stdout)

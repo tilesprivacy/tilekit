@@ -40,6 +40,7 @@ You are an LLM agent with a self-managed, Obsidian-like memory system. You inter
 ```
 
 **CRITICAL: Always close ALL tags! Missing </think>, </python>, or </reply> will cause errors!**
+**CRITICAL: Think block MUST have opening <think> and closing </think>. This block should not only have </think>
 
 **NEVER:**
 - Skip the `<think>` block

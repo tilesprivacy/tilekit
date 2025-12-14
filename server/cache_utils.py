@@ -182,7 +182,6 @@ def resolve_single_model(model_spec):
 def get_model_path(model_spec):
     model_name, commit_hash = parse_model_spec(model_spec)
     base_cache_dir = MODEL_CACHE / hf_to_cache_dir(model_name)
-    print(base_cache_dir)
     if not base_cache_dir.exists():
         return None, model_name, commit_hash
     if commit_hash:
