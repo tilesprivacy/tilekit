@@ -35,6 +35,8 @@ from pydantic import BaseModel, Field
 from .cache_utils import (
     get_model_path
 )
+from .hf_downloader import pull_model
+
 from .mlx_runner import MLXRunner
 
 from server.mem_agent.utils import extract_python_code, extract_reply, extract_thoughts, create_memory_if_not_exists, format_results
@@ -107,6 +109,9 @@ class ModelInfo(BaseModel):
 class StartRequest(BaseModel):
     model: str
     memory_path: str
+
+class downloadRequest(BaseModel):
+    model: str
 
 class Agent:
     def __init__(
@@ -198,6 +203,17 @@ def count_tokens(text: str) -> int:
 async def ping():
     return {"message": "Badda-Bing Badda-Bang"} 
 
+@app.post("/download")
+async def download(request:downloadRequest):
+    """ Download the model """
+    try:
+        if pull_model(request.model):
+            return {"message": "Model downloaded"}
+        else:
+            raise HTTPException(status_code=400, detail="Downloading model failed")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/start")
 async def start_model(request: StartRequest):
     """Load the model and start the agent"""
@@ -206,11 +222,8 @@ async def start_model(request: StartRequest):
     _messages = [ChatMessage(role="system", content=SYSTEM_PROMPT)]
     _memory_path = request.memory_path
 
-    try:
-        _runner = get_or_load_model(request.model)
-        return {"message": "Model loaded"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    _runner = get_or_load_model(request.model)
+    return {"message": "Model loaded"}
 
 @app.post("/v1/chat/completions")
 async def create_chat_completion(request: ChatCompletionRequest):

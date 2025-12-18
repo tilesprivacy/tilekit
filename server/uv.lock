@@ -980,6 +980,7 @@ source = { editable = "." }
 dependencies = [
     { name = "black" },
     { name = "fastapi" },
+    { name = "huggingface-hub" },
     { name = "mlx-lm" },
     { name = "uvicorn" },
 ]
@@ -988,6 +989,7 @@ dependencies = [
 requires-dist = [
     { name = "black" },
     { name = "fastapi" },
+    { name = "huggingface-hub", specifier = ">=0.34.0" },
     { name = "mlx-lm" },
     { name = "uvicorn" },
 ]

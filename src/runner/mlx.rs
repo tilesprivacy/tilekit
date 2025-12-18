@@ -2,7 +2,7 @@ use crate::core::modelfile::Modelfile;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
 use std::io::Write;
 use std::path::PathBuf;
@@ -201,10 +201,32 @@ async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
         .send()
         .await
         .unwrap();
+    match res.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::NOT_FOUND => download_model(model_name).await,
+        _ => {
+            println!("err {:?}", res);
+            Ok(())
+        }
+    }
+}
+
+async fn download_model(model_name: &str) -> Result<(), String> {
+    println!("Downloading the model {} ....", model_name);
+    let client = Client::new();
+    let body = json!({
+        "model": model_name
+    });
+    let res = client
+        .post("http://127.0.0.1:6969/download")
+        .json(&body)
+        .send()
+        .await
+        .unwrap();
     if res.status() == 200 {
         Ok(())
     } else {
-        Err(String::from("request failed"))
+        Err(String::from("Downloading model failed"))
     }
 }
 

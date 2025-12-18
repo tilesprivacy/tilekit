@@ -7,7 +7,8 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "mlx-lm",
-    "black"
+    "black",
+    "huggingface-hub>=0.34.0",
 ]
 
 [build-system]
