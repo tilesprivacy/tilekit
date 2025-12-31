@@ -3,6 +3,7 @@ Enhanced MLX model runner with direct API integration.
 Provides ollama-like run experience with streaming and interactive chat.
 """
 
+import sys
 import json
 import os
 import time
@@ -10,7 +11,10 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Dict, Optional
 
-import mlx.core as mx
+if sys.platform == "darwin":
+    import mlx.core as mx
+else:
+    mx = None
 from mlx_lm import load
 from mlx_lm.generate import generate_step
 from mlx_lm.sample_utils import make_repetition_penalty, make_sampler
