@@ -50,7 +50,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         }
         Commands::Server(server) => match server.command {
             Some(ServerCommands::Start) => commands::start_server().await,
-            Some(ServerCommands::Stop) => commands::stop_server(),
+            Some(ServerCommands::Stop) => commands::stop_server().await,
             _ => println!("Expected start or stop"),
         },
     }
