@@ -94,21 +94,18 @@ pub async fn start_server_daemon() -> Result<()> {
     }
 
     let config_dir = get_config_dir()?;
-    let server_dir = get_server_dir()?;
+    let mut server_dir = get_server_dir()?;
     let pid_file = config_dir.join("server.pid");
     fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
 
     let stdout_log = File::create(config_dir.join("server.out.log"))?;
     let stderr_log = File::create(config_dir.join("server.err.log"))?;
-    let child = Command::new("uv")
-        .args([
-            "run",
-            "--project",
-            server_dir.to_str().unwrap(),
-            "python",
-            "-m",
-            "server.main",
-        ])
+    let server_path = server_dir.join(".venv/bin/python3");
+    println!("{:?}", server_path);
+    server_dir.pop();
+    let child = Command::new(server_path)
+        .args(["-m", "server.main"])
+        .current_dir(server_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::from(stdout_log))
         .stderr(Stdio::from(stderr_log))
@@ -121,11 +118,15 @@ pub async fn start_server_daemon() -> Result<()> {
     Ok(())
 }
 
-pub fn stop_server_daemon() -> Result<()> {
+pub async fn stop_server_daemon() -> Result<()> {
+    if (ping().await).is_err() {
+        println!("Server is not running");
+        return Ok(());
+    }
     let pid_file = get_config_dir()?.join("server.pid");
 
     if !pid_file.exists() {
-        eprintln!("Server is not running");
+        eprintln!("server pid doesnt exist");
         return Ok(());
     }
 
@@ -159,6 +160,9 @@ async fn run_model_with_server(modelfile: Modelfile) -> reqwest::Result<()> {
         match input {
             "exit" => {
                 println!("Exiting interactive mode");
+                if !cfg!(debug_assertions) {
+                    let _res = stop_server_daemon().await;
+                }
                 break;
             }
             _ => {
