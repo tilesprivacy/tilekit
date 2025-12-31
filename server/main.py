@@ -1,9 +1,9 @@
 import uvicorn
 from .api import app
-from .config import  PORT
+from .config import PORT
 import logging
 import sys
-from fastapi import  Request
+from fastapi import Request
 
 # --- logging setup ---
 logging.basicConfig(
@@ -22,20 +22,23 @@ async def log_requests(request: Request, call_next):
     except Exception:
         body = None
 
-    logger.info({
-        "method": request.method,
-        "url": str(request.url),
-        "client": request.client.host,
-        "body": body,
-    })
+    logger.info(
+        {
+            "method": request.method,
+            "url": str(request.url),
+            "client": request.client.host,
+            "body": body,
+        }
+    )
 
     response = await call_next(request)
     logger.info(f"<-- {request.method} {request.url.path} {response.status_code}")
     return response
 
+
 def run():
     uvicorn.run(app, host="127.0.0.1", port=PORT)
 
+
 if __name__ == "__main__":
     run()
-

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ENV="prod" # prod is another env, try taking it from github env
-REPO="tilesprivacy/tilekit" 
+REPO="tilesprivacy/tiles" 
 # VERSION="${TILES_VERSION:-latest}"       
 VERSION="0.2.0"       
 INSTALL_DIR="$HOME/.local/bin"           # CLI install location
@@ -71,7 +71,7 @@ if ! command -v python3.13 >/dev/null 2>&1; then
     log "Installing Python 3.13 via Homebrew..."
     brew install python@3.13 || err "Failed to install Python 3.13"
   else
-    err "Python 3.13 is required but not found. Please install it manually. And retry installing tiles"
+    err "Python 3.13 is required but not found. Please install it manuallyv and retry installing tiles"
   fi
 fi
 
