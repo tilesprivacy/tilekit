@@ -101,7 +101,6 @@ pub async fn start_server_daemon() -> Result<()> {
     let stdout_log = File::create(config_dir.join("server.out.log"))?;
     let stderr_log = File::create(config_dir.join("server.err.log"))?;
     let server_path = server_dir.join(".venv/bin/python3");
-    println!("{:?}", server_path);
     server_dir.pop();
     let child = Command::new(server_path)
         .args(["-m", "server.main"])
@@ -274,8 +273,6 @@ async fn chat(
 
     let mut stream = res.bytes_stream();
     let mut accumulated = String::new();
-    // let mut inside_python = false;
-    // let mut tag_buffer = String::new();
     println!();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.unwrap();
@@ -300,19 +297,6 @@ async fn chat(
             }
         }
     }
-    // println!("{:?}", res);
-    // if res.status() == 200 {
-    //     let text = res.text().await.unwrap();
-    //     let v: Value = serde_json::from_str(&text).unwrap();
-    //     let content = v["choices"][0]["message"]["content"]
-    //         .as_str()
-    //         .unwrap_or("<no content>");
-
-    //     // Ok(convert_to_chat_response(content))
-    // } else {
-    //     // Err(String::from("request failed"))
-    // }
-    // unimplemented!()
     Err(String::from("request failed"))
 }
 

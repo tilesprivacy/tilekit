@@ -1,63 +1,30 @@
-from .config import SYSTEM_PROMPT
+from .mlx_runner import MLXRunner
+from ..cache_utils import get_model_path
+from fastapi import HTTPException
+from ..schemas import ChatMessage,  ChatCompletionRequest, downloadRequest
+from ..hf_downloader import pull_model
+
 import logging
 import json
 import time
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Dict, List, Optional, Union
-
-from pydantic import BaseModel, Field
-from .mlx_runner import MLXRunner
-from .cache_utils import get_model_path
-from fastapi import HTTPException
 
 logger = logging.getLogger("app")
+
+from typing import Any, Dict, List, Optional, Union
+
 _model_cache: Dict[str, MLXRunner] = {}
-_current_model_path: Optional[str] = None
 _default_max_tokens: Optional[int] = None  # Use dynamic model-aware limits by default
-
-_runner: MLXRunner = {}
-
-
-class ChatMessage(BaseModel):
-    role: str = Field(..., pattern="^(system|user|assistant)$")
-    content: str
+_current_model_path: Optional[str] = None
 
 
-_messages: list[ChatMessage] = []
-
-
-class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[ChatMessage]
-    chat_start: bool
-    python_code: str
-    max_tokens: Optional[int] = None
-    temperature: Optional[float] = 0.7
-    top_p: Optional[float] = 0.9
-    stream: Optional[bool] = False
-    stop: Optional[Union[str, List[str]]] = None
-    repetition_penalty: Optional[float] = 1.1
-
-
-class StartRequest(BaseModel):
-    model: str
-    memory_path: str
-
-
-def format_chat_messages_for_runner(
-    messages: List[ChatMessage],
-) -> List[Dict[str, str]]:
-    """Convert chat messages to format expected by MLXRunner.
-
-    Returns messages in dict format for the runner to apply chat templates.
-    """
-    return [{"role": msg.role, "content": msg.content} for msg in messages]
-
-
-def count_tokens(text: str) -> int:
-    """Rough token count estimation."""
-    return int(len(text.split()) * 1.3)  # Approximation, convert to int
+def download_model(model_name: str):
+    """Download the model"""
+    if pull_model(model_name):
+        return {"message": "Model downloaded"}
+    else:
+        raise HTTPException(status_code=400, detail="Downloading model failed")
 
 
 def get_or_load_model(model_spec: str, verbose: bool = False) -> MLXRunner:
@@ -111,21 +78,12 @@ def get_or_load_model(model_spec: str, verbose: bool = False) -> MLXRunner:
 
     return _model_cache[model_path_str]
 
-
-def start_model(request: StartRequest):
-    """Load the model and start the agent"""
-    global _runner
-
-    _runner = get_or_load_model(request.model)
-    return {"message": "Model loaded"}
-
-
 async def generate_chat_stream(
-    model: str, messages: List[ChatMessage], request: ChatCompletionRequest
+    messages: List[ChatMessage], request: ChatCompletionRequest
 ) -> AsyncGenerator[str, None]:
     """Generate streaming chat completion response."""
 
-    global _messages
+    _messages = messages
     completion_id = f"chatcmpl-{uuid.uuid4()}"
     created = int(time.time())
     runner = get_or_load_model(request.model)
@@ -209,3 +167,17 @@ async def generate_chat_stream(
 
     yield f"data: {json.dumps(final_response)}\n\n"
     yield "data: [DONE]\n\n"
+
+def format_chat_messages_for_runner(
+    messages: List[ChatMessage],
+) -> List[Dict[str, str]]:
+    """Convert chat messages to format expected by MLXRunner.
+
+    Returns messages in dict format for the runner to apply chat templates.
+    """
+    return [{"role": msg.role, "content": msg.content} for msg in messages]
+
+
+def count_tokens(text: str) -> int:
+    """Rough token count estimation."""
+    return int(len(text.split()) * 1.3)  # Approximation, convert to int
