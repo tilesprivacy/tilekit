@@ -61,7 +61,6 @@ async def create_chat_completion(request: ChatCompletionRequest):
         if request.stream:
             result = ({}, "")
             if request.python_code:
-                create_memory_if_not_exists()
                 result = execute_sandboxed_code(
                     code=request.python_code,
                     allowed_path=_memory_path,

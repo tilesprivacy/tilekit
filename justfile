@@ -12,7 +12,7 @@ check:
     cargo test
 
 serve:
-    uv run --project server python  -m server.main
+    server/.venv/bin/python3 -m server.main
 
 bundle:
     ./scripts/bundler.sh

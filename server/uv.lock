@@ -495,7 +495,7 @@ wheels = [
 [[package]]
 name = "server"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "black" },
     { name = "fastapi" },

@@ -249,7 +249,7 @@ class MLXRunner:
 
         # Model-specific handling based on known patterns
         # Use reasoning_utils for reasoning model detection and patterns
-        from .reasoning_utils import ReasoningExtractor
+        from ..reasoning_utils import ReasoningExtractor
 
         if hasattr(self.tokenizer, "name_or_path"):
             name_or_path = str(getattr(self.tokenizer, "name_or_path", "")).lower()
