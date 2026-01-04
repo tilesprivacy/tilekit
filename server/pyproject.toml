@@ -2,7 +2,7 @@
 name = "server"
 version = "0.1.0"
 description = "Local MLX inference server for the Tiles CLI"
-requires-python = ">=3.10"
+requires-python = "==3.13.*"
 dependencies = [
     "fastapi",
     "uvicorn",
