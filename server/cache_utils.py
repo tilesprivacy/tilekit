@@ -1,24 +1,3 @@
-# MIT License
-
-# Copyright (c) 2025 The BROKE team 🦫
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
 import datetime
 import json
 import os
@@ -56,15 +35,17 @@ def hf_to_cache_dir(hf_name: str) -> str:
     else:
         return f"models--{hf_name}"
 
+
 def cache_dir_to_hf(cache_name: str) -> str:
     if cache_name.startswith("models--"):
-        remaining = cache_name[len("models--"):]
+        remaining = cache_name[len("models--") :]
         if "--" in remaining:
             parts = remaining.split("--", 1)
             return f"{parts[0]}/{parts[1]}"
         else:
             return remaining
     return cache_name
+
 
 def expand_model_name(model_name):
     if "/" in model_name:
@@ -74,58 +55,67 @@ def expand_model_name(model_name):
     if mlx_cache_dir.exists():
         return mlx_candidate
     common_mlx_patterns = [
-        "Llama-", "Qwen", "Mistral", "Phi-", "Mixtral", "phi-", "deepseek"
+        "Llama-",
+        "Qwen",
+        "Mistral",
+        "Phi-",
+        "Mixtral",
+        "phi-",
+        "deepseek",
     ]
     for pattern in common_mlx_patterns:
         if pattern in model_name:
             return f"mlx-community/{model_name}"
     return model_name
 
+
 def find_matching_models(pattern):
     """Find models that match a partial pattern. Returns a list of (model_dir, hf_name) tuples."""
     all_models = [d for d in MODEL_CACHE.iterdir() if d.name.startswith("models--")]
     matches = []
-    
+
     for model_dir in all_models:
         hf_name = cache_dir_to_hf(model_dir.name)
         # Check if the pattern appears in the model name (case insensitive)
         if pattern.lower() in hf_name.lower():
             matches.append((model_dir, hf_name))
-    
+
     return matches
+
 
 def hash_exists_in_local_cache(model_name, commit_hash):
     """Check if a specific commit hash exists in the local cache for a model.
-    
+
     Supports both full hashes and short hash prefixes (local resolution only).
-    
+
     Args:
         model_name: Full model name (e.g., 'mlx-community/Phi-3-mini-4k-instruct-4bit')
         commit_hash: Commit hash to check for (short or full)
-    
+
     Returns:
         Full hash if exists in local cache, None otherwise
     """
     base_cache_dir = MODEL_CACHE / hf_to_cache_dir(model_name)
     if not base_cache_dir.exists():
         return None
-    
+
     snapshots_dir = base_cache_dir / "snapshots"
     if not snapshots_dir.exists():
         return None
-    
+
     # Check for exact match first (full hash)
     hash_dir = snapshots_dir / commit_hash
     if hash_dir.exists():
         return commit_hash
-    
+
     # Check for short hash match (local resolution)
     if len(commit_hash) < 40:
         for snapshot_dir in snapshots_dir.iterdir():
             if snapshot_dir.is_dir() and snapshot_dir.name.startswith(commit_hash):
                 return snapshot_dir.name  # Return full hash
-    
+
     return None
+
 
 def resolve_single_model(model_spec):
     """
@@ -135,18 +125,18 @@ def resolve_single_model(model_spec):
     """
     # Parse the model spec (handles @commit_hash syntax)
     model_name, commit_hash = parse_model_spec(model_spec)
-    
+
     # Try exact match first
     base_cache_dir = MODEL_CACHE / hf_to_cache_dir(model_name)
     if base_cache_dir.exists():
         return get_model_path(model_spec)
-    
+
     # Extract the base name (without @commit_hash) for fuzzy matching
-    base_spec = model_spec.split('@')[0] if '@' in model_spec else model_spec
-    
+    base_spec = model_spec.split("@")[0] if "@" in model_spec else model_spec
+
     # Try fuzzy matching
     matches = find_matching_models(base_spec)
-    
+
     if not matches:
         print(f"No models found matching '{base_spec}'!")
         return None, None, None
@@ -165,7 +155,7 @@ def resolve_single_model(model_spec):
             if resolved_hash:
                 resolved_spec = f"{hf_name}@{resolved_hash}"
                 return get_model_path(resolved_spec)
-        
+
         # Hash not found in any candidate model
         print(f"Hash '{commit_hash}' not found in any model matching '{base_spec}'")
         print("Available models:")
@@ -178,6 +168,7 @@ def resolve_single_model(model_spec):
         for _, hf_name in sorted(matches, key=lambda x: x[1]):
             print(f"  {hf_name}")
         return None, None, None
+
 
 def get_model_path(model_spec):
     model_name, commit_hash = parse_model_spec(model_spec)
@@ -199,6 +190,7 @@ def get_model_path(model_spec):
     # Return base_cache_dir for corrupted models so rm_model can handle them
     return base_cache_dir, model_name, commit_hash
 
+
 def parse_model_spec(model_spec):
     if "@" in model_spec:
         model_name, commit_hash = model_spec.rsplit("@", 1)
@@ -206,6 +198,7 @@ def parse_model_spec(model_spec):
         return model_name, commit_hash
     model_name = expand_model_name(model_spec)
     return model_name, None
+
 
 def get_model_size(model_path):
     if not model_path.exists():
@@ -220,6 +213,7 @@ def get_model_size(model_path):
         return f"{total_size / 1_000_000:.1f} MB"
     else:
         return f"{total_size / 1_000:.1f} KB"
+
 
 def get_model_modified(model_path):
     if not model_path.exists():
@@ -237,6 +231,7 @@ def get_model_modified(model_path):
         minutes = diff.seconds // 60
         return f"{minutes} minutes ago"
 
+
 def detect_framework(model_path, hf_name):
     """Detect model framework with lenient hints (Issue #31)."""
     # 1) org hint
@@ -246,7 +241,9 @@ def detect_framework(model_path, hf_name):
     # 2) README front matter: tags contains 'mlx' OR library_name == 'mlx'
     try:
         tags, pipeline, lib = read_readme_front_matter(Path(model_path))
-        if (lib and lib.lower() == "mlx") or (tags and any((t or '').lower() == "mlx" for t in tags)):
+        if (lib and lib.lower() == "mlx") or (
+            tags and any((t or "").lower() == "mlx" for t in tags)
+        ):
             return "MLX"
     except Exception:
         pass
@@ -261,7 +258,12 @@ def detect_framework(model_path, hf_name):
     has_config = any(snapshots_dir.glob("*/*.json"))
     total_size = get_model_size(Path(model_path))
     try:
-        size_mb = float(total_size.replace(" GB", "000").replace(" MB", "").replace(" KB", "0").replace(" ", ""))
+        size_mb = float(
+            total_size.replace(" GB", "000")
+            .replace(" MB", "")
+            .replace(" KB", "0")
+            .replace(" ", "")
+        )
     except Exception:
         size_mb = 0
     if has_gguf:
@@ -286,9 +288,13 @@ def detect_model_type(model_path, hf_name):
     try:
         tags, pipeline, _ = read_readme_front_matter(Path(model_path))
         tset = {t.lower() for t in (tags or [])}
-        if pipeline == "text-generation" or any(k in tset for k in {"chat", "instruct"}):
+        if pipeline == "text-generation" or any(
+            k in tset for k in {"chat", "instruct"}
+        ):
             return "chat"
-        if pipeline == "sentence-similarity" or any(k in tset for k in {"embedding", "embeddings"}):
+        if pipeline == "sentence-similarity" or any(
+            k in tset for k in {"embedding", "embeddings"}
+        ):
             return "embedding"
     except Exception:
         pass
@@ -314,6 +320,7 @@ def get_quantization_info(model_path):
     except Exception:
         return None
 
+
 def get_model_hash(model_path):
     snapshots_dir = model_path / "snapshots"
     if not snapshots_dir.exists():
@@ -323,6 +330,7 @@ def get_model_hash(model_path):
         return "--------"
     latest = max(snapshots, key=lambda x: x.stat().st_mtime)
     return latest.name[:8]
+
 
 def is_model_healthy(model_spec):
     """Strict health check for 1.x (backport of #27 rules).
@@ -361,7 +369,12 @@ def is_model_healthy(model_spec):
     # 2) Fail fast on partial/tmp markers anywhere in the snapshot
     for p in model_path.rglob("*"):
         name = p.name.lower()
-        if ".partial" in name or name.endswith(".partial") or name.endswith(".tmp") or "partial" in name:
+        if (
+            ".partial" in name
+            or name.endswith(".partial")
+            or name.endswith(".tmp")
+            or "partial" in name
+        ):
             return False
 
     # Helper: detect Git LFS pointer file
@@ -414,6 +427,7 @@ def is_model_healthy(model_spec):
     # 4) No index present — detect multi-shard pattern
     #    If pattern shards exist, require index (unhealthy without index by policy parity with 2.0)
     import re
+
     shard_re = re.compile(r"model-([0-9]{5})-of-([0-9]{5})\.(safetensors|bin)")
     pattern_files = []
     for f in model_path.glob("*"):
@@ -426,7 +440,11 @@ def is_model_healthy(model_spec):
         return False
 
     # 5) Single-file weights fallback (includes GGUF)
-    weight_files = list(model_path.rglob("*.safetensors")) + list(model_path.rglob("*.bin")) + list(model_path.rglob("*.gguf"))
+    weight_files = (
+        list(model_path.rglob("*.safetensors"))
+        + list(model_path.rglob("*.bin"))
+        + list(model_path.rglob("*.gguf"))
+    )
     # Exclude known pattern shards from consideration (handled above)
     filtered_weights = []
     for f in weight_files:
@@ -444,15 +462,16 @@ def is_model_healthy(model_spec):
     ok, _ = check_lfs_corruption(model_path)
     return ok
 
+
 def check_lfs_corruption(model_path):
     """Recursively scan for Git LFS pointer files (suspiciously small files)."""
     corrupted_files = []
     for file_path in model_path.rglob("*"):
         try:
             if file_path.is_file() and file_path.stat().st_size < 200:
-                with open(file_path, 'rb') as f:
+                with open(file_path, "rb") as f:
                     header = f.read(200)
-                    if b'version https://git-lfs.github.com/spec/v1' in header:
+                    if b"version https://git-lfs.github.com/spec/v1" in header:
                         corrupted_files.append(str(file_path.relative_to(model_path)))
         except Exception:
             # Ignore unreadable files in corruption scan, keep conservative
@@ -461,16 +480,17 @@ def check_lfs_corruption(model_path):
         return False, f"LFS pointers instead of files: {', '.join(corrupted_files)}"
     return True, "No LFS corruption detected"
 
+
 def check_model_health(model_spec):
     model_path, model_name, commit_hash = resolve_single_model(model_spec)
     if not model_path:
         # resolve_single_model already printed the appropriate error message
         return False
-        
+
     print(f"Checking model: {model_name}")
     if commit_hash:
         print(f"Hash: {commit_hash}")
-    
+
     # Use the robust health check
     if is_model_healthy(model_spec):
         print("\n[OK] Model is healthy and usable!")
@@ -478,7 +498,7 @@ def check_model_health(model_spec):
     else:
         # Detailed diagnosis for WHY it's unhealthy
         print("\n[ERROR] Model is corrupted. Detailed diagnosis:")
-        
+
         # Check config.json
         config_path = model_path / "config.json"
         if not config_path.exists():
@@ -493,55 +513,74 @@ def check_model_health(model_spec):
                     print("   - config.json found and valid")
             except (OSError, json.JSONDecodeError):
                 print("   - config.json exists but contains invalid JSON")
-        
+
         # Check weight files (including gguf support like is_model_healthy)
-        weight_files = list(model_path.glob("*.safetensors")) + list(model_path.glob("*.bin")) + list(model_path.glob("*.gguf"))
+        weight_files = (
+            list(model_path.glob("*.safetensors"))
+            + list(model_path.glob("*.bin"))
+            + list(model_path.glob("*.gguf"))
+        )
         if not weight_files:
-            weight_files = list(model_path.glob("**/*.safetensors")) + list(model_path.glob("**/*.bin")) + list(model_path.glob("**/*.gguf"))
-        
+            weight_files = (
+                list(model_path.glob("**/*.safetensors"))
+                + list(model_path.glob("**/*.bin"))
+                + list(model_path.glob("**/*.gguf"))
+            )
+
         if weight_files:
             total_size = sum(f.stat().st_size for f in weight_files)
             size_mb = total_size / (1024 * 1024)
-            print(f"   - Model weights found ({len(weight_files)} files, {size_mb:.1f}MB)")
+            print(
+                f"   - Model weights found ({len(weight_files)} files, {size_mb:.1f}MB)"
+            )
         elif (model_path / "model.safetensors.index.json").exists():
             # Check multi-file model
             try:
                 with open(model_path / "model.safetensors.index.json") as f:
                     index = json.load(f)
-                if 'weight_map' in index:
-                    referenced_files = set(index['weight_map'].values())
-                    existing_files = [f for f in referenced_files if (model_path / f).exists()]
+                if "weight_map" in index:
+                    referenced_files = set(index["weight_map"].values())
+                    existing_files = [
+                        f for f in referenced_files if (model_path / f).exists()
+                    ]
                     if existing_files:
-                        total_size = sum((model_path / f).stat().st_size for f in existing_files)
+                        total_size = sum(
+                            (model_path / f).stat().st_size for f in existing_files
+                        )
                         size_mb = total_size / (1024 * 1024)
-                        print(f"   - Multi-file weights ({len(existing_files)}/{len(referenced_files)} files, {size_mb:.1f}MB)")
+                        print(
+                            f"   - Multi-file weights ({len(existing_files)}/{len(referenced_files)} files, {size_mb:.1f}MB)"
+                        )
                         if len(existing_files) < len(referenced_files):
                             print("   - Incomplete multi-file model")
                     else:
-                        print("   - Multi-file model index found but no weight files exist")
+                        print(
+                            "   - Multi-file model index found but no weight files exist"
+                        )
                 else:
                     print("   - Multi-file model index is invalid")
             except Exception as e:
                 print(f"   - Multi-file model index error: {e}")
         else:
             print("   - No model weights found (.safetensors, .bin, .gguf)")
-        
+
         # Check LFS corruption
         lfs_ok, lfs_msg = check_lfs_corruption(model_path)
         if not lfs_ok:
             print(f"   - {lfs_msg}")
         else:
             print(f"   - {lfs_msg}")
-        
+
         # Show framework
         framework = detect_framework(model_path.parent.parent, model_name)
         print(f"   - Framework: {framework}")
-        
+
         # Offer deletion for corrupted models
         confirm = input("\nModel appears corrupted. Delete? [y/N] ")
         if confirm.lower() == "y":
             import errno
             import shutil
+
             try:
                 if commit_hash:
                     # Delete specific hash/snapshot
@@ -559,7 +598,9 @@ def check_model_health(model_spec):
                     print(f"Model {model_name} deleted.")
             except PermissionError as e:
                 print(f"[ERROR] Permission denied: Cannot delete {e.filename}")
-                print("   Try running with appropriate permissions or manually delete the directory.")
+                print(
+                    "   Try running with appropriate permissions or manually delete the directory."
+                )
             except OSError as e:
                 if e.errno == errno.ENOTEMPTY:
                     print(f"[ERROR] Directory not empty: {e.filename}")
@@ -569,9 +610,12 @@ def check_model_health(model_spec):
                 else:
                     print(f"[ERROR] OS Error while deleting: {e}")
             except Exception as e:
-                print(f"[ERROR] Unexpected error while deleting: {type(e).__name__}: {e}")
-        
+                print(
+                    f"[ERROR] Unexpected error while deleting: {type(e).__name__}: {e}"
+                )
+
         return False
+
 
 def check_all_models_health():
     models = [d for d in MODEL_CACHE.iterdir() if d.name.startswith("models--")]
@@ -605,7 +649,14 @@ def check_all_models_health():
         print("   python mlx_knife.cli health <model-name> # Show details")
     return len(problematic_models) == 0
 
-def list_models(show_all=False, framework_filter=None, show_health=False, single_model=None, verbose=False):
+
+def list_models(
+    show_all=False,
+    framework_filter=None,
+    show_health=False,
+    single_model=None,
+    verbose=False,
+):
     if single_model:
         # Try exact match first
         expanded_model = expand_model_name(single_model)
@@ -616,22 +667,26 @@ def list_models(show_all=False, framework_filter=None, show_health=False, single
         else:
             # If exact match fails, do partial name matching
             if not MODEL_CACHE.exists():
-                print(f"No models found matching '{single_model}' - cache directory doesn't exist yet.")
+                print(
+                    f"No models found matching '{single_model}' - cache directory doesn't exist yet."
+                )
                 print("Use 'mlxk pull <model-name>' to download models first.")
                 return
-            all_models = [d for d in MODEL_CACHE.iterdir() if d.name.startswith("models--")]
+            all_models = [
+                d for d in MODEL_CACHE.iterdir() if d.name.startswith("models--")
+            ]
             matching_models = []
-            
+
             for model_dir in all_models:
                 hf_name = cache_dir_to_hf(model_dir.name)
                 # Check if the pattern appears in the model name (case insensitive)
                 if single_model.lower() in hf_name.lower():
                     matching_models.append(model_dir)
-            
+
             if not matching_models:
                 print(f"No models found matching '{single_model}'!")
                 return
-            
+
             models = matching_models
     else:
         if not MODEL_CACHE.exists():
@@ -644,12 +699,18 @@ def list_models(show_all=False, framework_filter=None, show_health=False, single
             return
     if show_health:
         if show_all:
-            print(f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'FRAMEWORK':<10} {'TYPE':<10} {'HEALTH':<8}")
+            print(
+                f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'FRAMEWORK':<10} {'TYPE':<10} {'HEALTH':<8}"
+            )
         else:
-            print(f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'HEALTH':<8}")
+            print(
+                f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'HEALTH':<8}"
+            )
     else:
         if show_all:
-            print(f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'FRAMEWORK':<10} {'TYPE':<10}")
+            print(
+                f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15} {'FRAMEWORK':<10} {'TYPE':<10}"
+            )
         else:
             print(f"{'NAME':<40} {'ID':<10} {'SIZE':<10} {'MODIFIED':<15}")
     for m in sorted(models, key=lambda x: x.stat().st_mtime, reverse=True):
@@ -671,25 +732,42 @@ def list_models(show_all=False, framework_filter=None, show_health=False, single
         display_name = hf_name
         if hf_name.startswith("mlx-community/") and not verbose:
             # For MLX models, hide prefix unless verbose is set
-            display_name = hf_name[len("mlx-community/"):]
+            display_name = hf_name[len("mlx-community/") :]
         health_status = ""
         if show_health:
             health_status = "[OK]" if is_model_healthy(hf_name) else "[ERR]"
             if show_all:
-                print(f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {framework:<10} {model_type:<10} {health_status:<8}")
+                print(
+                    f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {framework:<10} {model_type:<10} {health_status:<8}"
+                )
             else:
-                print(f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {health_status:<8}")
+                print(
+                    f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {health_status:<8}"
+                )
         else:
             if show_all:
-                print(f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {framework:<10} {model_type:<10}")
+                print(
+                    f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15} {framework:<10} {model_type:<10}"
+                )
             else:
                 print(f"{display_name:<40} {model_hash:<10} {size:<10} {modified:<15}")
 
-def run_model(model_spec, prompt=None, interactive=False, temperature=0.7,
-              max_tokens=500, top_p=0.9, repetition_penalty=1.1, stream=True,
-              use_chat_template=True, hide_reasoning=False, verbose=False):
+
+def run_model(
+    model_spec,
+    prompt=None,
+    interactive=False,
+    temperature=0.7,
+    max_tokens=500,
+    top_p=0.9,
+    repetition_penalty=1.1,
+    stream=True,
+    use_chat_template=True,
+    hide_reasoning=False,
+    verbose=False,
+):
     """Run an MLX model with enhanced features.
-    
+
     Args:
         model_spec: Model specification (name[@hash])
         prompt: Input prompt (if None and not interactive, enters interactive mode)
@@ -730,7 +808,9 @@ def run_model(model_spec, prompt=None, interactive=False, temperature=0.7,
         )
     except ImportError:
         # Fallback to subprocess if mlx_runner is not available
-        print("[WARNING] Enhanced runner not available, falling back to subprocess mode")
+        print(
+            "[WARNING] Enhanced runner not available, falling back to subprocess mode"
+        )
         print(f"Running model: {model_name}")
         if commit_hash:
             print(f"Hash: {commit_hash}")
@@ -741,7 +821,10 @@ def run_model(model_spec, prompt=None, interactive=False, temperature=0.7,
             prompt = prompt or "Hello"
 
         print(f"Prompt: {prompt}\n")
-        os.system(f'python -m mlx_lm generate --model "{model_path}" --prompt "{prompt}"')
+        os.system(
+            f'python -m mlx_lm generate --model "{model_path}" --prompt "{prompt}"'
+        )
+
 
 def show_model(model_spec, show_files=False, show_config=False):
     """Show detailed information about a specific model."""
@@ -774,7 +857,7 @@ def show_model(model_spec, show_files=False, show_config=False):
     model_type = detect_model_type(model_path.parent.parent, model_name)
     print(f"Framework: {framework}")
     print(f"Type: {model_type}")
-    
+
     # Quantization info (if available)
     quant_info = get_quantization_info(model_path)
     if quant_info:
@@ -787,11 +870,13 @@ def show_model(model_spec, show_files=False, show_config=False):
                 main_config.append(f"{quant_info['bits']}-bit")
             if "group_size" in quant_info:
                 main_config.append(f"group_size: {quant_info['group_size']}")
-            
+
             if main_config:
                 print(f"Quantization: {', '.join(main_config)}")
                 if "mode" in quant_info:
-                    print(f"  Advanced mode '{quant_info['mode']}' (requires MLX ≥0.29.0, MLX-LM ≥0.27.0)")
+                    print(
+                        f"  Advanced mode '{quant_info['mode']}' (requires MLX ≥0.29.0, MLX-LM ≥0.27.0)"
+                    )
         else:
             print(f"Quantization: {quant_info}")
 
@@ -807,7 +892,9 @@ def show_model(model_spec, show_files=False, show_config=False):
                 config_data = json.load(f)
 
             # 1. Check for explicit quantization field (MLX style)
-            if "quantization" in config_data and isinstance(config_data["quantization"], dict):
+            if "quantization" in config_data and isinstance(
+                config_data["quantization"], dict
+            ):
                 quant = config_data["quantization"]
                 if "bits" in quant:
                     quantization_info = f"{quant['bits']}-bit"
@@ -878,7 +965,7 @@ def show_model(model_spec, show_files=False, show_config=False):
                     quantization_info = "Multiple GGUF variants available"
                     precision_info = "gguf (see variants below)"
                 elif len(gguf_variants) == 1:
-                    quantization_info = gguf_variants[0].split(' (')[0]
+                    quantization_info = gguf_variants[0].split(" (")[0]
                     precision_info = "gguf"
                 else:
                     quantization_info = "GGUF format (quantization unknown)"
@@ -915,9 +1002,17 @@ def show_model(model_spec, show_files=False, show_config=False):
         if not (model_path / "config.json").exists():
             issues.append("config.json missing")
 
-        weight_files = list(model_path.glob("*.safetensors")) + list(model_path.glob("*.bin")) + list(model_path.glob("*.gguf"))
+        weight_files = (
+            list(model_path.glob("*.safetensors"))
+            + list(model_path.glob("*.bin"))
+            + list(model_path.glob("*.gguf"))
+        )
         if not weight_files:
-            weight_files = list(model_path.glob("**/*.safetensors")) + list(model_path.glob("**/*.bin")) + list(model_path.glob("**/*.gguf"))
+            weight_files = (
+                list(model_path.glob("**/*.safetensors"))
+                + list(model_path.glob("**/*.bin"))
+                + list(model_path.glob("**/*.gguf"))
+            )
         if not weight_files:
             index_file = model_path / "model.safetensors.index.json"
             if not index_file.exists():
@@ -974,23 +1069,23 @@ def show_model(model_spec, show_files=False, show_config=False):
 
     return True
 
+
 def rm_model(model_spec, force=False):
     original_spec = model_spec
-    
+
     # First try to resolve using fuzzy matching
     resolved_path, resolved_name, resolved_hash = resolve_single_model(model_spec)
-    
+
     if not resolved_path:
         # resolve_single_model already printed the error message for most cases
         # But ensure we always provide feedback to the user
         print(f"Model '{original_spec}' not found or corrupted.")
         return
-        
+
     # Use the resolved model name for deletion
     model_name = resolved_name
     commit_hash = resolved_hash
-    
-    
+
     # Confirm on auto-expansion (if the resolved name is different from input)
     base_spec = original_spec.split("@")[0] if "@" in original_spec else original_spec
     if base_spec != model_name and "/" not in base_spec:
@@ -998,7 +1093,7 @@ def rm_model(model_spec, force=False):
         if confirm.lower() == "n":
             print("Delete aborted.")
             return
-    
+
     base_cache_dir = MODEL_CACHE / hf_to_cache_dir(model_name)
     # This should exist since resolve_single_model succeeded, but double-check
     if not base_cache_dir.exists():
@@ -1021,13 +1116,13 @@ def rm_model(model_spec, force=False):
         else:
             confirm = input(f"Delete hash {commit_hash} of model {model_name}? [y/N] ")
             confirm_delete = confirm.lower() == "y"
-        
+
         if confirm_delete:
             # Issue #23 Fix: Delete entire model directory, not just the snapshot
             # This prevents the double-execution problem where refs/ remain intact
             shutil.rmtree(base_cache_dir)
             print(f"{model_name}@{commit_hash} deleted")
-            
+
             # Clean up associated lock files
             try:
                 _cleanup_model_locks(model_name, force)
@@ -1040,13 +1135,15 @@ def rm_model(model_spec, force=False):
         if force:
             confirm_delete = True
         else:
-            confirm = input(f"Delete entire model {model_name} ({base_cache_dir})? [y/N] ")
+            confirm = input(
+                f"Delete entire model {model_name} ({base_cache_dir})? [y/N] "
+            )
             confirm_delete = confirm.lower() == "y"
-        
+
         if confirm_delete:
             shutil.rmtree(base_cache_dir)
             print(f"Model {model_name} completely deleted.")
-            
+
             # Clean up associated lock files
             try:
                 _cleanup_model_locks(model_name, force)
@@ -1058,22 +1155,22 @@ def rm_model(model_spec, force=False):
 
 def _cleanup_model_locks(model_name, force=False):
     """Clean up HuggingFace lock files for a deleted model.
-    
+
     Args:
         model_name: The model name (e.g. 'microsoft/DialoGPT-small')
         force: If True, delete without asking. If False, prompt user.
     """
     locks_dir = MODEL_CACHE / ".locks" / hf_to_cache_dir(model_name)
-    
+
     if not locks_dir.exists():
         return  # No locks to clean up
-    
+
     # Count lock files
     try:
         lock_files = list(locks_dir.iterdir())
         if not lock_files:
             return  # Empty directory
-        
+
         if force:
             # Delete without asking
             shutil.rmtree(locks_dir)
@@ -1086,7 +1183,6 @@ def _cleanup_model_locks(model_name, force=False):
                 print(f"Cache files cleaned up ({len(lock_files)} files).")
             else:
                 print("Cache files left intact.")
-                
+
     except Exception as e:
         print(f"Warning: Could not clean up cache files: {e}")
-

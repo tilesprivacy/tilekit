@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV="prod" # prod is another env, try taking it from github env
-REPO="tilesprivacy/tilekit" 
+ENV="dev" # prod is another env, try taking it from github env
+REPO="tilesprivacy/tiles" 
 # VERSION="${TILES_VERSION:-latest}"       
-VERSION="0.2.0"       
+VERSION="0.3.0"       
 INSTALL_DIR="$HOME/.local/bin"           # CLI install location
 SERVER_DIR="$HOME/.local/share/tiles/server"         # Python server folder
 TMPDIR="$(mktemp -d)"
@@ -43,7 +43,7 @@ if [[ "$ENV" == "prod" ]]; then
   TAR_URL="https://github.com/${REPO}/releases/download/${VERSION}/tiles-v${VERSION}-${ARCH}-${OS}.tar.gz"
   curl -fsSL -o "${TMPDIR}/tiles.tar.gz" "$TAR_URL"
 else
-  # Installer suppose to ran from tilekit root folder after running the bundler
+  # Installer suppose to ran from tiles root folder after running the bundler
   mv "dist/tiles-v${VERSION}-${ARCH}-${OS}.tar.gz" "${TMPDIR}/tiles.tar.gz" 
 fi
 
@@ -71,7 +71,7 @@ if ! command -v python3.13 >/dev/null 2>&1; then
     log "Installing Python 3.13 via Homebrew..."
     brew install python@3.13 || err "Failed to install Python 3.13"
   else
-    err "Python 3.13 is required but not found. Please install it manually."
+    err "Python 3.13 is required but not found. Please install it manuallyv and retry installing tiles"
   fi
 fi
 

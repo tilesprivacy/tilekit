@@ -22,7 +22,7 @@ rm -rf "${DIST_DIR}/tmp/server/__pycache__"
 rm -rf "${DIST_DIR}/tmp/server/.venv"
 
 echo "📦 Creating ${OUT_NAME}.tar.gz..."
-tar -czf "${DIST_DIR}/${OUT_NAME}.tar.gz" -C "${DIST_DIR}/tmp" .
+tar --exclude-from=scripts/tar.exclude -czf "${DIST_DIR}/${OUT_NAME}.tar.gz" -C "${DIST_DIR}/tmp" .
 
 rm -rf "${DIST_DIR}/tmp"
 

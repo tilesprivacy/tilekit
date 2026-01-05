@@ -1,0 +1,20 @@
+This project includes code derived from third-party open-source projects.
+
+---
+
+Project: mlx-knife
+Author: The BROKE team 🦫
+Source: https://github.com/mzau/mlx-knife
+License: MIT
+
+Description:
+Modules regarding mlx from mlx-knife has been used as our starting point and for further references
+
+
+Project: mem-agent-mcp
+Author: Dria
+Source: https://github.com/firstbatchxyz/mem-agent-mcp
+License: Apache-2.0 license
+
+Description:
+Modules regarding mem-agent cli from mem-agent-mcp has been used as our starting point and for further references
