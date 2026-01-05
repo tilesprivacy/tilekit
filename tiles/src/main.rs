@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use clap::{Args, Parser, Subcommand};
+use tiles::runtime::build_runtime;
 mod commands;
 #[derive(Debug, Parser)]
 #[command(name = "tiles")]
@@ -38,19 +39,20 @@ enum ServerCommands {
     /// Stops the daemon py server
     Stop,
 }
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 pub async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
+    let runtime = build_runtime();
     match cli.command {
         Commands::Run { modelfile_path } => {
-            commands::run(modelfile_path).await;
+            commands::run(&runtime, modelfile_path).await;
         }
         Commands::Health => {
             commands::check_health();
         }
         Commands::Server(server) => match server.command {
-            Some(ServerCommands::Start) => commands::start_server().await,
-            Some(ServerCommands::Stop) => commands::stop_server().await,
+            Some(ServerCommands::Start) => commands::start_server(&runtime).await,
+            Some(ServerCommands::Stop) => commands::stop_server(&runtime).await,
             _ => println!("Expected start or stop"),
         },
     }

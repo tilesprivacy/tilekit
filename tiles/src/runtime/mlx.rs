@@ -12,18 +12,88 @@ use std::{env, fs};
 use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
+
+pub struct MLXRuntime {}
+
+impl MLXRuntime {}
 pub struct ChatResponse {
     // think: String,
     reply: String,
     code: String,
 }
 
-pub async fn run(modelfile: Modelfile) {
-    let model = modelfile.from.as_ref().unwrap();
-    if model.starts_with("driaforall/mem-agent") {
-        let _res = run_model_with_server(modelfile).await;
-    } else {
-        run_model_by_sub_process(modelfile);
+impl Default for MLXRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MLXRuntime {
+    pub fn new() -> Self {
+        MLXRuntime {}
+    }
+
+    pub async fn run(&self, run_args: super::RunArgs) {
+        let model = run_args.modelfile.from.as_ref().unwrap();
+        if model.starts_with("driaforall/mem-agent") {
+            let _res = run_model_with_server(self, run_args.modelfile).await;
+        } else {
+            run_model_by_sub_process(run_args.modelfile);
+        }
+    }
+
+    #[allow(clippy::zombie_processes)]
+    pub async fn start_server_daemon(&self) -> Result<()> {
+        // check if the server is running
+        // start server as a child process
+        // save the pid in a file under ~/.config/tiles/server_pid
+
+        if (ping().await).is_ok() {
+            println!("server is already up");
+            return Ok(());
+        }
+
+        let config_dir = get_config_dir()?;
+        let mut server_dir = get_server_dir()?;
+        let pid_file = config_dir.join("server.pid");
+        fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
+
+        let stdout_log = File::create(config_dir.join("server.out.log"))?;
+        let stderr_log = File::create(config_dir.join("server.err.log"))?;
+        let server_path = server_dir.join(".venv/bin/python3");
+        server_dir.pop();
+        let child = Command::new(server_path)
+            .args(["-m", "server.main"])
+            .current_dir(server_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::from(stdout_log))
+            .stderr(Stdio::from(stderr_log))
+            .spawn()
+            .expect("failed to start server");
+
+        fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
+        std::fs::write(pid_file, child.id().to_string()).unwrap();
+        println!("Server started with PID {}", child.id());
+        Ok(())
+    }
+
+    pub async fn stop_server_daemon(&self) -> Result<()> {
+        if (ping().await).is_err() {
+            println!("Server is not running");
+            return Ok(());
+        }
+        let pid_file = get_config_dir()?.join("server.pid");
+
+        if !pid_file.exists() {
+            eprintln!("server pid doesnt exist");
+            return Ok(());
+        }
+
+        let pid = std::fs::read_to_string(&pid_file).unwrap();
+        Command::new("kill").arg(pid.trim()).status().unwrap();
+        std::fs::remove_file(pid_file).unwrap();
+        println!("Server stopped.");
+        Ok(())
     }
 }
 
@@ -82,62 +152,12 @@ fn run_model_by_sub_process(modelfile: Modelfile) {
     }
 }
 
-#[allow(clippy::zombie_processes)]
-pub async fn start_server_daemon() -> Result<()> {
-    // check if the server is running
-    // start server as a child process
-    // save the pid in a file under ~/.config/tiles/server_pid
-
-    if (ping().await).is_ok() {
-        println!("server is already up");
-        return Ok(());
-    }
-
-    let config_dir = get_config_dir()?;
-    let mut server_dir = get_server_dir()?;
-    let pid_file = config_dir.join("server.pid");
-    fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
-
-    let stdout_log = File::create(config_dir.join("server.out.log"))?;
-    let stderr_log = File::create(config_dir.join("server.err.log"))?;
-    let server_path = server_dir.join(".venv/bin/python3");
-    server_dir.pop();
-    let child = Command::new(server_path)
-        .args(["-m", "server.main"])
-        .current_dir(server_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::from(stdout_log))
-        .stderr(Stdio::from(stderr_log))
-        .spawn()
-        .expect("failed to start server");
-
-    fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
-    std::fs::write(pid_file, child.id().to_string()).unwrap();
-    println!("Server started with PID {}", child.id());
-    Ok(())
-}
-
-pub async fn stop_server_daemon() -> Result<()> {
-    if (ping().await).is_err() {
-        println!("Server is not running");
-        return Ok(());
-    }
-    let pid_file = get_config_dir()?.join("server.pid");
-
-    if !pid_file.exists() {
-        eprintln!("server pid doesnt exist");
-        return Ok(());
-    }
-
-    let pid = std::fs::read_to_string(&pid_file).unwrap();
-    Command::new("kill").arg(pid.trim()).status().unwrap();
-    std::fs::remove_file(pid_file).unwrap();
-    println!("Server stopped.");
-    Ok(())
-}
-async fn run_model_with_server(modelfile: Modelfile) -> reqwest::Result<()> {
+async fn run_model_with_server(
+    mlx_runtime: &MLXRuntime,
+    modelfile: Modelfile,
+) -> reqwest::Result<()> {
     if !cfg!(debug_assertions) {
-        let _res = start_server_daemon().await;
+        let _res = mlx_runtime.start_server_daemon().await;
         let _ = wait_until_server_is_up().await;
     }
     let stdin = io::stdin();
@@ -160,7 +180,7 @@ async fn run_model_with_server(modelfile: Modelfile) -> reqwest::Result<()> {
             "exit" => {
                 println!("Exiting interactive mode");
                 if !cfg!(debug_assertions) {
-                    let _res = stop_server_daemon().await;
+                    let _res = mlx_runtime.stop_server_daemon().await;
                 }
                 break;
             }

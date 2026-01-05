@@ -30,3 +30,9 @@ just serve
 ```
 
 2. In another terminal, run the Rust CLI using Cargo as usual.
+
+```sh
+cd tiles
+
+cargo run
+```

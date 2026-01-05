@@ -1,5 +1,5 @@
 pub mod core;
-pub mod runner;
+pub mod runtime;
 
 #[cfg(test)]
 mod tests {}
