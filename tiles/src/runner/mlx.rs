@@ -1,4 +1,3 @@
-use crate::core::modelfile::Modelfile;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
@@ -11,6 +10,7 @@ use std::process::Stdio;
 use std::time::Duration;
 use std::{env, fs};
 use std::{io, process::Command};
+use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
 pub struct ChatResponse {
     // think: String,

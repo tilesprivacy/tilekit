@@ -1,13 +1,8 @@
 // Module that handles CLI commands
 
 use anyhow::Result;
-use tiles::{
-    core::{
-        health,
-        modelfile::{self, Modelfile},
-    },
-    runner::mlx,
-};
+use tilekit::{modelfile, modelfile::Modelfile};
+use tiles::{core::health, runner::mlx};
 
 const DEFAULT_MODELFILE: &str = "
   FROM driaforall/mem-agent-mlx-4bit 
