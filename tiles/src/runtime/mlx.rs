@@ -34,11 +34,28 @@ impl MLXRuntime {
     }
 
     pub async fn run(&self, run_args: super::RunArgs) {
-        let model = run_args.modelfile.from.as_ref().unwrap();
-        if model.starts_with("driaforall/mem-agent") {
-            let _res = run_model_with_server(self, run_args.modelfile).await;
+        const DEFAULT_MODELFILE: &str = "FROM driaforall/mem-agent-mlx-4bit";
+
+        // Parse modelfile
+        let modelfile_parse_result = if let Some(modelfile_str) = run_args.modelfile_path {
+            tilekit::modelfile::parse_from_file(modelfile_str.as_str())
         } else {
-            run_model_by_sub_process(run_args.modelfile);
+            tilekit::modelfile::parse(DEFAULT_MODELFILE)
+        };
+
+        let modelfile = match modelfile_parse_result {
+            Ok(mf) => mf,
+            Err(_err) => {
+                println!("Invalid Modelfile");
+                return;
+            }
+        };
+
+        let model = modelfile.from.as_ref().unwrap();
+        if model.starts_with("driaforall/mem-agent") {
+            let _res = run_model_with_server(self, modelfile, run_args.retry_count).await;
+        } else {
+            run_model_by_sub_process(modelfile);
         }
     }
 
@@ -155,6 +172,7 @@ fn run_model_by_sub_process(modelfile: Modelfile) {
 async fn run_model_with_server(
     mlx_runtime: &MLXRuntime,
     modelfile: Modelfile,
+    retry_count: u32,
 ) -> reqwest::Result<()> {
     if !cfg!(debug_assertions) {
         let _res = mlx_runtime.start_server_daemon().await;
@@ -185,12 +203,12 @@ async fn run_model_with_server(
                 break;
             }
             _ => {
-                let mut remaining_count = 6;
+                let mut remaining_count = retry_count;
                 let mut g_reply: String = "".to_owned();
                 let mut python_code: String = "".to_owned();
                 loop {
                     if remaining_count > 0 {
-                        let chat_start = remaining_count == 6;
+                        let chat_start = remaining_count == retry_count;
                         if let Ok(response) = chat(input, modelname, chat_start, &python_code).await
                         {
                             if response.reply.is_empty() {
