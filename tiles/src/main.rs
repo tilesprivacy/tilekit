@@ -31,8 +31,8 @@ enum Commands {
 
 #[derive(Debug, Args)]
 struct RunFlags {
-    /// Number of chat retries before giving up (default: 6)
-    #[arg(short = 'r', long, default_value_t = 6)]
+    /// Number of chat retries before giving up
+    #[arg(short = 'r', long, default_value_t = 10)]
     retry_count: u32,
     // Future flags go here:
     // #[arg(long, default_value_t = 6969)]
