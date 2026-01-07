@@ -1,16 +1,16 @@
 use crate::runtime::RunArgs;
+use crate::utils::config::{get_config_dir, get_memory_path, get_server_dir};
 use crate::utils::hf_model_downloader::*;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
 use reqwest::{Client, StatusCode};
 use serde_json::{Value, json};
+use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
-use std::{env, fs};
 use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
@@ -174,15 +174,15 @@ async fn run_model_with_server(
     mlx_runtime: &MLXRuntime,
     modelfile: Modelfile,
     run_args: &RunArgs,
-) -> reqwest::Result<()> {
+) -> Result<()> {
     if !cfg!(debug_assertions) {
-        let _res = mlx_runtime.start_server_daemon().await;
+        let _ = mlx_runtime.start_server_daemon().await.inspect_err(|e| {
+            eprintln!("Failed to start daemon server due to {:?}", e);
+        });
         let _ = wait_until_server_is_up().await;
     }
     // loading the model from mem-agent via daemon server
-    let memory_path = get_memory_path()
-        .context("Retrieving memory_path failed")
-        .unwrap();
+    let memory_path = get_memory_path().context("Retrieving memory_path failed")?;
     let modelname = modelfile.from.as_ref().unwrap();
     match load_model(modelname, &memory_path).await {
         Ok(_) => start_repl(mlx_runtime, modelname, run_args).await,
@@ -380,74 +380,6 @@ fn extract_python(content: &str) -> String {
 //         "".to_owned()
 //     }
 // }
-
-fn get_memory_path() -> Result<String> {
-    let tiles_config_dir = get_config_dir()?;
-    let tiles_data_dir = get_data_dir()?;
-    let mut is_memory_path_found: bool = false;
-    let mut memory_path: String = String::from("");
-    if tiles_config_dir.is_dir()
-        && let Ok(content) = fs::read_to_string(tiles_config_dir.join(".memory_path"))
-    {
-        memory_path = content;
-        is_memory_path_found = true;
-    }
-
-    if is_memory_path_found {
-        Ok(memory_path)
-    } else {
-        let memory_path = tiles_data_dir.join("memory");
-        fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
-        fs::create_dir_all(&tiles_config_dir).context("Failed to create tiles config directory")?;
-        fs::write(
-            tiles_config_dir.join(".memory_path"),
-            memory_path.to_str().unwrap(),
-        )
-        .context("Failed to write the default path to .memory_path")?;
-        Ok(memory_path.to_string_lossy().to_string())
-    }
-}
-
-fn get_server_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join("server"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let data_dir = match env::var("XDG_DATA_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".local/share"),
-        };
-        Ok(data_dir.join("tiles/server"))
-    }
-}
-fn get_config_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join(".tiles_dev/tiles"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let config_dir = match env::var("XDG_CONFIG_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".config"),
-        };
-        Ok(config_dir.join("tiles"))
-    }
-}
-
-fn get_data_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join(".tiles_dev/tiles"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let data_dir = match env::var("XDG_DATA_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".local/share"),
-        };
-        Ok(data_dir.join("tiles"))
-    }
-}
 
 async fn wait_until_server_is_up() {
     loop {

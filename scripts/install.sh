@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV="prod" # prod is another env, try taking it from github env
+ENV="dev" # prod is another env, try taking it from github env
 REPO="tilesprivacy/tiles" 
 # VERSION="${TILES_VERSION:-latest}"       
 VERSION="0.3.0"       
