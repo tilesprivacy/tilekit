@@ -1,3 +1,4 @@
+use crate::utils::hf_model_downloader::*;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
@@ -12,7 +13,6 @@ use std::{env, fs};
 use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
-
 pub struct MLXRuntime {}
 
 impl MLXRuntime {}
@@ -35,7 +35,7 @@ impl MLXRuntime {
 
     pub async fn run(&self, run_args: super::RunArgs) {
         let model = run_args.modelfile.from.as_ref().unwrap();
-        if model.starts_with("driaforall/mem-agent") {
+        if model.starts_with("driaforall/") {
             let _res = run_model_with_server(self, run_args.modelfile).await;
         } else {
             run_model_by_sub_process(run_args.modelfile);
@@ -160,14 +160,21 @@ async fn run_model_with_server(
         let _res = mlx_runtime.start_server_daemon().await;
         let _ = wait_until_server_is_up().await;
     }
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
     // loading the model from mem-agent via daemon server
     let memory_path = get_memory_path()
         .context("Retrieving memory_path failed")
         .unwrap();
     let modelname = modelfile.from.as_ref().unwrap();
-    load_model(modelname, &memory_path).await.unwrap();
+    match load_model(modelname, &memory_path).await {
+        Ok(_) => start_repl(mlx_runtime, modelname).await,
+        Err(err) => println!("{}", err),
+    }
+    Ok(())
+}
+
+async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str) {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
     println!("Running in interactive mode");
     // TODO: Handle "enter" key press or any key press when repl is processing an input
     loop {
@@ -215,7 +222,6 @@ async fn run_model_with_server(
             }
         }
     }
-    Ok(())
 }
 
 async fn ping() -> Result<(), String> {
@@ -234,6 +240,8 @@ async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
         "model": model_name,
         "memory_path": memory_path
     });
+
+    //TODO: Fix the unwrap here
     let res = client
         .post("http://127.0.0.1:6969/start")
         .json(&body)
@@ -242,30 +250,90 @@ async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
         .unwrap();
     match res.status() {
         StatusCode::OK => Ok(()),
-        StatusCode::NOT_FOUND => download_model(model_name).await,
+        StatusCode::NOT_FOUND => {
+            println!("Downloading {}\n", model_name);
+            match pull_model(model_name).await {
+                Ok(_) => {
+                    println!("\nDownloading completed \n");
+                    Ok(())
+                }
+                Err(err) => Err(err),
+            }
+        }
         _ => {
             println!("err {:?}", res);
-            Ok(())
+            Err(format!(
+                "Failed to load model {} due to {:?}",
+                model_name, res
+            ))
         }
     }
 }
 
+async fn download_stream(model_name: &str) -> Result<(), String> {
+    println!("Downloading the model {} ....", model_name);
+    let client = Client::new();
+
+    let body = json!({
+        "model": model_name,
+    });
+    let res = client
+        .post("http://127.0.0.1:6969/download-stream")
+        .json(&body)
+        .send()
+        .await
+        .unwrap();
+
+    let mut stream = res.bytes_stream();
+    let mut accumulated = String::new();
+    println!();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.unwrap();
+        let s = String::from_utf8_lossy(&chunk);
+        for line in s.lines() {
+            if !line.starts_with("data: ") {
+                continue;
+            }
+
+            let data = line.trim_start_matches("data: ");
+
+            if data == "[DONE]" {
+                print!("download completed");
+                return Ok(());
+            }
+            // Parse JSON
+            let v: Value = serde_json::from_str(data).unwrap();
+            println!("{:?}", v["event"]["percent"].as_str());
+            if let Some(delta) = v["event"]["percent"].as_str() {
+                accumulated.push_str(delta);
+                print!("{}", delta.dimmed());
+                use std::io::Write;
+                std::io::stdout().flush().ok();
+            } else {
+                print!("error");
+            }
+        }
+    }
+    Err(String::from("request failed"))
+}
 async fn download_model(model_name: &str) -> Result<(), String> {
     println!("Downloading the model {} ....", model_name);
     let client = Client::new();
     let body = json!({
         "model": model_name
     });
+    // TODO: fix the unwrap here
     let res = client
         .post("http://127.0.0.1:6969/download")
         .json(&body)
         .send()
         .await
         .unwrap();
+
     if res.status() == 200 {
         Ok(())
     } else {
-        Err(String::from("Downloading model failed"))
+        Err(format!("Downloading model failed due to {:?}", res))
     }
 }
 
