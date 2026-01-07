@@ -211,12 +211,12 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                 break;
             }
             _ => {
-                let mut remaining_count = run_args.retry_count;
+                let mut remaining_count = run_args.relay_count;
                 let mut g_reply: String = "".to_owned();
                 let mut python_code: String = "".to_owned();
                 loop {
                     if remaining_count > 0 {
-                        let chat_start = remaining_count == run_args.retry_count;
+                        let chat_start = remaining_count == run_args.relay_count;
                         if let Ok(response) = chat(input, modelname, chat_start, &python_code).await
                         {
                             if response.reply.is_empty() {

@@ -31,9 +31,9 @@ enum Commands {
 
 #[derive(Debug, Args)]
 struct RunFlags {
-    /// Number of chat retries before giving up
+    /// Max times cli communicates with the model until it gets a proper reply for a user prompt
     #[arg(short = 'r', long, default_value_t = 10)]
-    retry_count: u32,
+    relay_count: u32,
     // Future flags go here:
     // #[arg(long, default_value_t = 6969)]
     // port: u16,
@@ -66,7 +66,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         } => {
             let run_args = RunArgs {
                 modelfile_path,
-                retry_count: flags.retry_count,
+                relay_count: flags.relay_count,
             };
             commands::run(&runtime, run_args).await;
         }

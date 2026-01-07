@@ -7,7 +7,7 @@ pub mod mlx;
 
 pub struct RunArgs {
     pub modelfile_path: Option<String>,
-    pub retry_count: u32,
+    pub relay_count: u32,
     // Future flags go here
 }
 
