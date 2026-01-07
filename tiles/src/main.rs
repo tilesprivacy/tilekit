@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use clap::{Args, Parser, Subcommand};
-use tiles::runtime::{build_runtime, RunArgs};
+use tiles::runtime::{RunArgs, build_runtime};
 mod commands;
 #[derive(Debug, Parser)]
 #[command(name = "tiles")]
@@ -31,10 +31,9 @@ enum Commands {
 
 #[derive(Debug, Args)]
 struct RunFlags {
-    /// Number of chat retries before giving up (default: 6)
-    #[arg(short = 'r', long, default_value_t = 6)]
-    retry_count: u32,
-
+    /// Max times cli communicates with the model until it gets a proper reply for a user prompt
+    #[arg(short = 'r', long, default_value_t = 10)]
+    relay_count: u32,
     // Future flags go here:
     // #[arg(long, default_value_t = 6969)]
     // port: u16,
@@ -61,10 +60,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let runtime = build_runtime();
     match cli.command {
-        Commands::Run { modelfile_path, flags } => {
+        Commands::Run {
+            modelfile_path,
+            flags,
+        } => {
             let run_args = RunArgs {
                 modelfile_path,
-                retry_count: flags.retry_count,
+                relay_count: flags.relay_count,
             };
             commands::run(&runtime, run_args).await;
         }

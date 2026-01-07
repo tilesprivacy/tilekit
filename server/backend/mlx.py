@@ -12,7 +12,7 @@ from collections.abc import AsyncGenerator
 
 logger = logging.getLogger("app")
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Iterator, List, Optional, Union
 
 _model_cache: Dict[str, MLXRunner] = {}
 _default_max_tokens: Optional[int] = None  # Use dynamic model-aware limits by default
@@ -181,3 +181,4 @@ def format_chat_messages_for_runner(
 def count_tokens(text: str) -> int:
     """Rough token count estimation."""
     return int(len(text.split()) * 1.3)  # Approximation, convert to int
+
