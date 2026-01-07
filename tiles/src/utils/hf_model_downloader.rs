@@ -1,11 +1,10 @@
+/// Manages model snapshot downloading from HuggingFace
 use std::{env, path::PathBuf};
 
 use hf_hub::api::{
     Siblings,
-    tokio::{Api, ApiBuilder, ApiError},
+    tokio::{ApiBuilder, ApiError},
 };
-
-/// Manages model snapshot downloading from HuggingFace
 
 /// Download the entire model (including snapshot) for the given model name
 pub async fn pull_model(model_name: &str) -> Result<(), String> {
@@ -13,7 +12,7 @@ pub async fn pull_model(model_name: &str) -> Result<(), String> {
 }
 
 pub async fn snapshot_download(modelname: &str) -> Result<(), String> {
-    let allow_patterns = vec![
+    let allow_patterns = [
         ".json",
         ".txt",
         ".safetensors",
@@ -67,15 +66,6 @@ fn format_hf_api_error(api_error: ApiError) -> String {
     }
 }
 
-fn parse_model_name(model_name: &str) -> (String, Option<String>) {
-    match model_name.split_once('@') {
-        Some((model_name, commit_hash)) if commit_hash.len() > 0 => {
-            (String::from(model_name), Some(String::from(commit_hash)))
-        }
-        _ => (String::from(model_name), None),
-    }
-}
-
 fn get_model_cache() -> String {
     let default_cache = format!(
         "{}/.cache/huggingface",
@@ -90,26 +80,5 @@ fn get_model_cache() -> String {
     format!("{}/hub", cache_root)
 }
 
-fn hf_to_cache_dir(model_name: &str) -> String {
-    if model_name.starts_with("models--") {
-        return model_name.to_owned();
-    }
-
-    match model_name.split_once("/") {
-        Some((org, model)) if model.len() > 0 => {
-            format!("models--{}--{}", org, model)
-        }
-        _ => format!("models--{}", model_name),
-    }
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_pull_model() {
-        let _ = pull_model("driaforall/Tiny-Agent-a-0.5B");
-        // let _ = pull_model("driaforall/Tiny-Agent-a-0.5B");
-    }
-}
+mod tests {}
