@@ -1,8 +1,7 @@
 use std::error::Error;
 
 use clap::{Args, Parser, Subcommand};
-use tiles::runtime::build_runtime;
-
+use tiles::runtime::{RunArgs, build_runtime};
 mod commands;
 #[derive(Debug, Parser)]
 #[command(name = "tiles")]
@@ -15,13 +14,29 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
     /// Runs the given Modelfile (runs the default model if none passed)
-    Run { modelfile_path: Option<String> },
+    Run {
+        /// Path to the Modelfile (uses default model if not provided)
+        modelfile_path: Option<String>,
+
+        #[command(flatten)]
+        flags: RunFlags,
+    },
 
     /// Checks the status of dependencies
     Health,
 
     /// start or stop the daemon server
     Server(ServerArgs),
+}
+
+#[derive(Debug, Args)]
+struct RunFlags {
+    /// Number of chat retries before giving up (default: 6)
+    #[arg(short = 'r', long, default_value_t = 6)]
+    retry_count: u32,
+    // Future flags go here:
+    // #[arg(long, default_value_t = 6969)]
+    // port: u16,
 }
 
 #[derive(Debug, Args)]
@@ -45,8 +60,15 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
     let runtime = build_runtime();
     match cli.command {
-        Commands::Run { modelfile_path } => {
-            commands::run(&runtime, modelfile_path).await;
+        Commands::Run {
+            modelfile_path,
+            flags,
+        } => {
+            let run_args = RunArgs {
+                modelfile_path,
+                retry_count: flags.retry_count,
+            };
+            commands::run(&runtime, run_args).await;
         }
         Commands::Health => {
             commands::check_health();
