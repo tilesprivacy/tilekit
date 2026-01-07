@@ -4,18 +4,15 @@
     <img src="https://avatars.githubusercontent.com/u/210493283?s=400&u=1ee6e44b6a683b16bdb6e9e853c7ebd8c7fd4268&v=4" alt="Tiles Logo" width="128" />
   </a>
 </p>
+
 <h1 align="center">Tiles</h1>
+
 <p align="center">
-  Your private AI assistant with offline memory
-  <br />
-  <a href="#about">About</a>
-  ·
-  <a href="https://tiles.run/download">Download</a>
-  ·
-  <a href="https://book.tiles.run">Tiles Book</a>
-  ·
-  <a href="CONTRIBUTING.md">Contributing</a>
-  ·
+  Your private AI assistant with offline memory<br />
+  <a href="#about">About</a> ·
+  <a href="https://tiles.run/download">Download</a> ·
+  <a href="https://tiles.run/book">Tiles Book</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
   <a href="HACKING.md">Developing</a>
 </p>
 
@@ -29,7 +26,7 @@ The SDK is a Modelfile based Rust library that contains all of our model deploym
 
 Define models using a Modelfile, the blueprint for creating and sharing models. Our implementation is optimized for fast, efficient local deployment across consumer platforms, starting with Apple devices.
 
-## Tiles Local GUI
+## Tiles GUI
 > To be released Q1 26.
 
 Use the Local GUI for chats on your laptop. It includes a REST API and an integration for OpenWebUI. The experience will feel familiar to anyone who has used chatbots like ChatGPT or Claude.
@@ -40,7 +37,7 @@ See the [download page](https://tiles.run/download) on the Tiles website.
 
 ## Documentation
 
-See the [Tiles book](https://book.tiles.run/) on the Tiles website.
+See the [Tiles book](https://tiles.run/book) on the Tiles website.
 
 ## About
 
