@@ -36,7 +36,7 @@ pub async fn snapshot_download(modelname: &str) -> Result<(), String> {
                         .filter(|sibling| {
                             allow_patterns
                                 .iter()
-                                .any(|pat| sibling.rfilename.contains(pat))
+                                .any(|pat| sibling.rfilename.ends_with(pat))
                         })
                         .collect::<Vec<&Siblings>>();
 
