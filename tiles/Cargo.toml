@@ -14,3 +14,4 @@ tokio = { version = "1" , features = ["macros", "rt-multi-thread"]}
 owo-colors = "4"
 futures-util = "0.3"
 hf-hub = {version = "0.4", features = ["tokio"]}
+rustyline = "14.0"

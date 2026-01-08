@@ -4,14 +4,19 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
 use reqwest::{Client, StatusCode};
+use rustyline::completion::Completer;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::history::DefaultHistory;
+use rustyline::validate::Validator;
+use rustyline::{Config, Editor, Helper};
 use serde_json::{Value, json};
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
 use std::{env, fs};
-use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
 pub struct MLXRuntime {}
@@ -170,6 +175,55 @@ fn run_model_by_sub_process(modelfile: Modelfile) {
     }
 }
 
+struct TilesHinter;
+
+impl Hinter for TilesHinter {
+    type Hint = String;
+
+    fn hint(&self, line: &str, _pos: usize, _ctx: &rustyline::Context<'_>) -> Option<Self::Hint> {
+        if line.is_empty() {
+            Some("Send a message (/? for help)".to_string())
+        } else {
+            None
+        }
+    }
+}
+
+impl Completer for TilesHinter {
+    type Candidate = String;
+}
+
+impl Highlighter for TilesHinter {
+    fn highlight_hint<'h>(&self, hint: &'h str) -> std::borrow::Cow<'h, str> {
+        std::borrow::Cow::Owned(format!("\x1b[2m{}\x1b[0m", hint))
+    }
+}
+
+impl Validator for TilesHinter {}
+
+impl Helper for TilesHinter {}
+
+fn show_help(model_name: &str) {
+    println!("\n=== Tiles REPL Help ===\n");
+
+    println!("Available Commands:");
+    println!("  /?          Show this help message");
+    println!("  /help       Show this help message");
+    println!("  /bye        Exit the REPL");
+    println!("  exit        Exit the REPL (alternative to /bye)");
+    println!();
+
+    println!("Current Model:");
+    println!("  {}", model_name);
+    println!();
+
+    println!("Usage Tips:");
+    println!("  - Type your questions or prompts directly");
+    println!("  - Model outputs <think>, <python>, and <reply> tags");
+    println!("  - Only <reply> content is shown as final output");
+    println!();
+}
+
 async fn run_model_with_server(
     mlx_runtime: &MLXRuntime,
     modelfile: Modelfile,
@@ -192,53 +246,96 @@ async fn run_model_with_server(
 }
 
 async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArgs) {
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
     println!("Running in interactive mode");
+
+    // Setup rustyline editor with hint support
+    let config = Config::builder().auto_add_history(true).build();
+    let mut rl = Editor::<TilesHinter, DefaultHistory>::with_config(config).unwrap();
+    rl.set_helper(Some(TilesHinter));
+
     // TODO: Handle "enter" key press or any key press when repl is processing an input
     loop {
-        print!(">> ");
-        stdout.flush().unwrap();
-        let mut input = String::new();
-        stdin.read_line(&mut input).unwrap();
-        let input = input.trim();
-        match input {
-            "exit" => {
+        let readline = rl.readline(">>> ");
+        let input = match readline {
+            Ok(line) => line.trim().to_string(),
+            Err(_) => {
+                // User pressed Ctrl+C or Ctrl+D
                 println!("Exiting interactive mode");
                 if !cfg!(debug_assertions) {
                     let _res = mlx_runtime.stop_server_daemon().await;
                 }
                 break;
             }
-            _ => {
-                let mut remaining_count = run_args.relay_count;
-                let mut g_reply: String = "".to_owned();
-                let mut python_code: String = "".to_owned();
-                loop {
-                    if remaining_count > 0 {
-                        let chat_start = remaining_count == run_args.relay_count;
-                        if let Ok(response) = chat(input, modelname, chat_start, &python_code).await
-                        {
-                            if response.reply.is_empty() {
-                                if !response.code.is_empty() {
-                                    python_code = response.code;
-                                }
-                                remaining_count -= 1;
-                            } else {
-                                g_reply = response.reply.clone();
-                                println!("\n>> {}", response.reply.trim());
-                                break;
-                            }
-                        } else {
-                            println!("\n>> failed to respond");
-                            break;
-                        }
-                    }
+        };
+
+        // Handle slash commands
+        if let Some(cmd) = input.strip_prefix('/') {
+            match cmd {
+                "help" | "?" => {
+                    show_help(modelname);
+                    continue;
                 }
-                if g_reply.is_empty() {
-                    println!(">> No reply")
+                "bye" => {
+                    println!("Exiting interactive mode");
+                    if !cfg!(debug_assertions) {
+                        let _res = mlx_runtime.stop_server_daemon().await;
+                    }
+                    break;
+                }
+                "" => {
+                    println!("Empty command. Type /help for available commands.");
+                    continue;
+                }
+                _ => {
+                    println!(
+                        "Unknown command: /{}. Type /help for available commands.",
+                        cmd
+                    );
+                    continue;
                 }
             }
+        }
+
+        // Keep "exit" for backward compatibility
+        if input == "exit" {
+            println!("Exiting interactive mode");
+            if !cfg!(debug_assertions) {
+                let _res = mlx_runtime.stop_server_daemon().await;
+            }
+            break;
+        }
+
+        // Skip empty input
+        if input.is_empty() {
+            continue;
+        }
+
+        // Send to model
+        let mut remaining_count = run_args.relay_count;
+        let mut g_reply: String = "".to_owned();
+        let mut python_code: String = "".to_owned();
+        loop {
+            if remaining_count > 0 {
+                let chat_start = remaining_count == run_args.relay_count;
+                if let Ok(response) = chat(&input, modelname, chat_start, &python_code).await {
+                    if response.reply.is_empty() {
+                        if !response.code.is_empty() {
+                            python_code = response.code;
+                        }
+                        remaining_count -= 1;
+                    } else {
+                        g_reply = response.reply.clone();
+                        println!("\n>> {}", response.reply.trim());
+                        break;
+                    }
+                } else {
+                    println!("\n>> failed to respond");
+                    break;
+                }
+            }
+        }
+        if g_reply.is_empty() {
+            println!(">> No reply")
         }
     }
 }
