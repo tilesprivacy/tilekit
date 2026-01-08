@@ -1,7 +1,7 @@
 from .mlx_runner import MLXRunner
 from ..cache_utils import get_model_path
 from fastapi import HTTPException
-from ..schemas import ChatMessage,  ChatCompletionRequest, downloadRequest
+from ..schemas import ChatMessage, ChatCompletionRequest, downloadRequest, GenerationMetrics
 from ..hf_downloader import pull_model
 
 import logging
@@ -113,6 +113,7 @@ async def generate_chat_stream(
     yield f"data: {json.dumps(initial_response)}\n\n"
 
     # Stream tokens
+    metrics = None
     try:
         for token in runner.generate_streaming(
             prompt=prompt,
@@ -125,6 +126,11 @@ async def generate_chat_stream(
             use_chat_template=False,  # Already applied in _format_conversation
             use_chat_stop_tokens=False,  # Server mode shouldn't stop on chat markers
         ):
+            # Check if this is metrics object (last item yielded)
+            if isinstance(token, GenerationMetrics):
+                metrics = token
+                continue
+
             chunk_response = {
                 "id": completion_id,
                 "object": "chat.completion.chunk",
@@ -156,7 +162,7 @@ async def generate_chat_stream(
         }
         yield f"data: {json.dumps(error_response)}\n\n"
 
-    # Final response
+    # Final response with metrics
     final_response = {
         "id": completion_id,
         "object": "chat.completion.chunk",
@@ -164,6 +170,15 @@ async def generate_chat_stream(
         "model": request.model,
         "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
     }
+
+    # Include benchmarking metrics if available
+    if metrics:
+        final_response["metrics"] = {
+            "ttft_ms": metrics.ttft_ms,
+            "total_tokens": metrics.total_tokens,
+            "tokens_per_second": metrics.tokens_per_second,
+            "total_latency_s": metrics.total_latency_s,
+        }
 
     yield f"data: {json.dumps(final_response)}\n\n"
     yield "data: [DONE]\n\n"

@@ -18,3 +18,7 @@ pub async fn start_server(runtime: &Runtime) {
 pub async fn stop_server(runtime: &Runtime) {
     let _ = runtime.stop_server_daemon().await;
 }
+
+pub async fn bench(runtime: &Runtime, run_args: RunArgs) {
+    runtime.bench(run_args).await;
+}

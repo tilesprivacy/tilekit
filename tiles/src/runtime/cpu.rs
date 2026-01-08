@@ -23,4 +23,8 @@ impl CPURuntime {
     pub async fn stop_server_daemon(&self) -> Result<()> {
         unimplemented!()
     }
+
+    pub async fn bench(&self, _run_args: super::RunArgs) {
+        unimplemented!()
+    }
 }

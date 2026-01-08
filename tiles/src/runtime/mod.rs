@@ -37,6 +37,13 @@ impl Runtime {
             Runtime::Cpu(runtime) => runtime.stop_server_daemon().await,
         }
     }
+
+    pub async fn bench(&self, run_args: RunArgs) {
+        match self {
+            Runtime::Mlx(runtime) => runtime.bench(run_args).await,
+            Runtime::Cpu(runtime) => runtime.bench(run_args).await,
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
