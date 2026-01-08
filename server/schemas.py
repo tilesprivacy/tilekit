@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional, Union
+from dataclasses import dataclass
 
 class CompletionRequest(BaseModel):
     model: str
@@ -63,3 +64,12 @@ class StartRequest(BaseModel):
 
 class downloadRequest(BaseModel):
     model: str
+
+
+@dataclass
+class GenerationMetrics:
+    """Benchmarking metrics for token generation."""
+    ttft_ms: float  # Time to first token in milliseconds
+    total_tokens: int  # Total tokens generated
+    tokens_per_second: float  # Throughput
+    total_latency_s: float  # End-to-end latency in seconds
