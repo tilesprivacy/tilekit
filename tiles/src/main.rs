@@ -22,6 +22,12 @@ enum Commands {
         flags: RunFlags,
     },
 
+    /// Runs a benchmark and saves results to log file
+    Bench {
+        /// Path to the Modelfile (uses default model if not provided)
+        modelfile_path: Option<String>,
+    },
+
     /// Checks the status of dependencies
     Health,
 
@@ -69,6 +75,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 relay_count: flags.relay_count,
             };
             commands::run(&runtime, run_args).await;
+        }
+        Commands::Bench { modelfile_path } => {
+            let run_args = RunArgs {
+                modelfile_path,
+                relay_count: 0, // unused by bench
+            };
+            commands::bench(&runtime, run_args).await;
         }
         Commands::Health => {
             commands::check_health();

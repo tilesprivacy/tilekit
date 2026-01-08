@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use owo_colors::OwoColorize;
 use reqwest::{Client, StatusCode};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::fs::File;
 use std::io::Write;
@@ -17,15 +18,43 @@ use tokio::time::sleep;
 pub struct MLXRuntime {}
 
 impl MLXRuntime {}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct BenchmarkMetrics {
+    ttft_ms: f64,
+    total_tokens: i32,
+    tokens_per_second: f64,
+    total_latency_s: f64,
+}
+
 pub struct ChatResponse {
     // think: String,
     reply: String,
     code: String,
+    metrics: Option<BenchmarkMetrics>,
 }
 
 impl Default for MLXRuntime {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+const DEFAULT_MODELFILE: &str = "FROM driaforall/mem-agent-mlx-4bit";
+
+fn parse_modelfile(modelfile_path: &Option<String>) -> Option<Modelfile> {
+    let parse_result = if let Some(path) = modelfile_path {
+        tilekit::modelfile::parse_from_file(path.as_str())
+    } else {
+        tilekit::modelfile::parse(DEFAULT_MODELFILE)
+    };
+
+    match parse_result {
+        Ok(mf) => Some(mf),
+        Err(_) => {
+            println!("Invalid Modelfile");
+            None
+        }
     }
 }
 
@@ -35,21 +64,8 @@ impl MLXRuntime {
     }
 
     pub async fn run(&self, run_args: super::RunArgs) {
-        const DEFAULT_MODELFILE: &str = "FROM driaforall/mem-agent-mlx-4bit";
-
-        // Parse modelfile
-        let modelfile_parse_result = if let Some(modelfile_str) = &run_args.modelfile_path {
-            tilekit::modelfile::parse_from_file(modelfile_str.as_str())
-        } else {
-            tilekit::modelfile::parse(DEFAULT_MODELFILE)
-        };
-
-        let modelfile = match modelfile_parse_result {
-            Ok(mf) => mf,
-            Err(_err) => {
-                println!("Invalid Modelfile");
-                return;
-            }
+        let Some(modelfile) = parse_modelfile(&run_args.modelfile_path) else {
+            return;
         };
 
         let model = modelfile.from.as_ref().unwrap();
@@ -83,6 +99,7 @@ impl MLXRuntime {
         let child = Command::new(server_path)
             .args(["-m", "server.main"])
             .current_dir(server_dir)
+            .env("PYTHONDONTWRITEBYTECODE", "1") // Disable .pyc caching
             .stdin(Stdio::null())
             .stdout(Stdio::from(stdout_log))
             .stderr(Stdio::from(stderr_log))
@@ -113,6 +130,86 @@ impl MLXRuntime {
         println!("Server stopped.");
         Ok(())
     }
+
+    pub async fn bench(&self, run_args: super::RunArgs) {
+        let Some(modelfile) = parse_modelfile(&run_args.modelfile_path) else {
+            return;
+        };
+
+        let modelname = modelfile.from.as_ref().unwrap();
+
+        // Start server if not running
+        if (ping().await).is_err() {
+            println!("Starting server...");
+            let _res = self.start_server_daemon().await;
+            let _ = wait_until_server_is_up().await;
+        }
+
+        // Load model
+        let memory_path = get_memory_path()
+            .context("Retrieving memory_path failed")
+            .unwrap();
+        if let Err(e) = load_model(modelname, &memory_path).await {
+            println!("Failed to load model: {}", e);
+            return;
+        }
+
+        println!("Running benchmark...");
+
+        // Run benchmark prompt
+        let benchmark_prompt = "What is 2+2? Please answer concisely.";
+        match chat(benchmark_prompt, modelname, true, "").await {
+            Ok(response) => {
+                if let Some(metrics) = response.metrics {
+                    println!("\n{} Benchmark Results:", "✓".green());
+                    println!("  TTFT:       {:.0}ms", metrics.ttft_ms);
+                    println!("  Throughput: {:.1} tok/s", metrics.tokens_per_second);
+                    println!("  Tokens:     {}", metrics.total_tokens);
+                    println!("  Latency:    {:.2}s", metrics.total_latency_s);
+
+                    // Save to log file
+                    save_benchmark_to_log(&metrics, modelname).unwrap_or_else(|e| {
+                        eprintln!("Failed to save benchmark log: {}", e);
+                    });
+                } else {
+                    println!("No metrics returned");
+                }
+            }
+            Err(e) => {
+                println!("Benchmark failed: {}", e);
+            }
+        }
+    }
+}
+
+fn save_benchmark_to_log(metrics: &BenchmarkMetrics, model: &str) -> Result<()> {
+    use chrono::Local;
+
+    let config_dir = get_config_dir()?;
+    let log_file = config_dir.join("benchmark_log.jsonl");
+
+    // Create benchmark log entry
+    let log_entry = serde_json::json!({
+        "timestamp": Local::now().to_rfc3339(),
+        "model": model,
+        "ttft_ms": metrics.ttft_ms,
+        "total_tokens": metrics.total_tokens,
+        "tokens_per_second": metrics.tokens_per_second,
+        "total_latency_s": metrics.total_latency_s,
+    });
+
+    // Append to log file
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)?;
+
+    use std::io::Write;
+    writeln!(file, "{}", log_entry)?;
+
+    println!("\n{} Saved to: {}", "💾".cyan(), log_file.display());
+
+    Ok(())
 }
 
 fn run_model_by_sub_process(modelfile: Modelfile) {
@@ -227,6 +324,18 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                             } else {
                                 g_reply = response.reply.clone();
                                 println!("\n>> {}", response.reply.trim());
+
+                                // Display benchmark metrics if available
+                                if let Some(metrics) = response.metrics {
+                                    println!(
+                                        "\n{} {:.1} tok/s | {} tokens | {:.0}ms TTFT",
+                                        "💡".yellow(),
+                                        metrics.tokens_per_second,
+                                        metrics.total_tokens,
+                                        metrics.ttft_ms
+                                    );
+                                }
+
                                 break;
                             }
                         } else {
@@ -313,6 +422,7 @@ async fn chat(
 
     let mut stream = res.bytes_stream();
     let mut accumulated = String::new();
+    let mut metrics: Option<BenchmarkMetrics> = None;
     println!();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.unwrap();
@@ -325,10 +435,16 @@ async fn chat(
             let data = line.trim_start_matches("data: ");
 
             if data == "[DONE]" {
-                return Ok(convert_to_chat_response(&accumulated));
+                return Ok(convert_to_chat_response(&accumulated, metrics));
             }
             // Parse JSON
             let v: Value = serde_json::from_str(data).unwrap();
+
+            // Check for metrics in the response
+            if let Some(metrics_obj) = v.get("metrics") {
+                metrics = serde_json::from_value(metrics_obj.clone()).ok();
+            }
+
             if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
                 accumulated.push_str(delta);
                 print!("{}", delta.dimmed());
@@ -340,11 +456,11 @@ async fn chat(
     Err(String::from("request failed"))
 }
 
-fn convert_to_chat_response(content: &str) -> ChatResponse {
-    // content.split()
+fn convert_to_chat_response(content: &str, metrics: Option<BenchmarkMetrics>) -> ChatResponse {
     ChatResponse {
         reply: extract_reply(content),
         code: extract_python(content),
+        metrics,
     }
 }
 
