@@ -1,4 +1,8 @@
 use crate::runtime::RunArgs;
+use crate::utils::config::{
+    create_default_memory_folder, get_config_dir, get_default_memory_path, get_memory_path,
+    get_server_dir, set_memory_path,
+};
 use crate::utils::hf_model_downloader::*;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
@@ -11,12 +15,11 @@ use rustyline::history::DefaultHistory;
 use rustyline::validate::Validator;
 use rustyline::{Config, Editor, Helper};
 use serde_json::{Value, json};
+use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
-use std::process::Command;
 use std::process::Stdio;
 use std::time::Duration;
-use std::{env, fs};
+use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
 pub struct MLXRuntime {}
@@ -41,8 +44,7 @@ impl MLXRuntime {
 
     pub async fn run(&self, run_args: super::RunArgs) {
         const DEFAULT_MODELFILE: &str = "FROM driaforall/mem-agent-mlx-4bit";
-
-        // Parse modelfile
+        //Parse modelfile
         let modelfile_parse_result = if let Some(modelfile_str) = &run_args.modelfile_path {
             tilekit::modelfile::parse_from_file(modelfile_str.as_str())
         } else {
@@ -59,7 +61,9 @@ impl MLXRuntime {
 
         let model = modelfile.from.as_ref().unwrap();
         if model.starts_with("driaforall/mem-agent") {
-            let _res = run_model_with_server(self, modelfile, &run_args).await;
+            let _res = run_model_with_server(self, modelfile, &run_args)
+                .await
+                .inspect_err(|e| eprintln!("Failed to run the model due to {e}"));
         } else {
             run_model_by_sub_process(modelfile);
         }
@@ -258,32 +262,101 @@ async fn run_model_with_server(
     mlx_runtime: &MLXRuntime,
     modelfile: Modelfile,
     run_args: &RunArgs,
-) -> reqwest::Result<()> {
+) -> Result<()> {
     if !cfg!(debug_assertions) {
-        let _res = mlx_runtime.start_server_daemon().await;
+        let _ = mlx_runtime.start_server_daemon().await.inspect_err(|e| {
+            eprintln!("Failed to start daemon server due to {:?}", e);
+        });
         let _ = wait_until_server_is_up().await;
     }
     // loading the model from mem-agent via daemon server
-    let memory_path = get_memory_path()
-        .context("Retrieving memory_path failed")
-        .unwrap();
+    let memory_path = get_or_set_memory_path().context("Setting/Retrieving memory_path failed")?;
     let modelname = modelfile.from.as_ref().unwrap();
     match load_model(modelname, &memory_path).await {
         Ok(_) => start_repl(mlx_runtime, modelname, run_args).await,
-        Err(err) => println!("{}", err),
+        Err(err) => return Err(anyhow::anyhow!(err)),
     }
     Ok(())
+}
+
+fn get_or_set_memory_path() -> Result<String> {
+    match get_memory_path() {
+        Ok(memory_path) => Ok(memory_path),
+        Err(_err) => {
+            let stdin = io::stdin();
+            let default_memory_pathbuf = get_default_memory_path()?;
+            let mut default_memory = default_memory_pathbuf
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Invalid path"))?;
+            let mut chose_yes = false;
+
+            println!(
+                "{}",
+                format!(
+                    "Default Memory location will be set at {:?}\n",
+                    default_memory
+                )
+                .yellow()
+            );
+            println!("You can always change the location with `tiles memory set-path <PATH>`\n");
+            println!("Do you want to add a custom memory location right now instead? [Y/N]");
+            let mut input = String::new();
+            loop {
+                input.clear();
+                stdin.read_line(&mut input)?;
+                input = input.trim().to_owned();
+                if (input == "Y" || input == "y") || chose_yes {
+                    if !chose_yes {
+                        chose_yes = true;
+                        println!("Add the path for your custom memory");
+                        continue;
+                    }
+                    match set_memory_path(input.as_str()) {
+                        Ok(msg) => {
+                            default_memory = input.as_str();
+                            println!("{}", msg.green());
+                            println!(
+                                "You can always change the location with `tiles memory set-path <PATH>`\n"
+                            );
+                            break;
+                        }
+                        Err(err) => {
+                            let error_msg =
+                                format!("Try again, Error setting memory path due to {:?}", err);
+                            println!("{}", error_msg.red());
+                            continue;
+                        }
+                    }
+                } else {
+                    create_default_memory_folder()?;
+                    match set_memory_path(default_memory) {
+                        Ok(msg) => {
+                            println!("{}", msg.green());
+                            println!(
+                                "You can always change the location with `tiles memory set-path <PATH>`\n"
+                            );
+                            break;
+                        }
+                        Err(err) => {
+                            let error_msg = format!("Error setting memory path due to {:?}", err);
+                            println!("{}", error_msg.red());
+                            return Err(anyhow::anyhow!("Error setting default memory path"));
+                        }
+                    }
+                }
+            }
+            Ok(default_memory.to_owned())
+        }
+    }
 }
 
 async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArgs) {
     println!("Running in interactive mode");
 
-    // Setup rustyline editor with hint support
     let config = Config::builder().auto_add_history(true).build();
     let mut editor = Editor::<TilesHinter, DefaultHistory>::with_config(config).unwrap();
     editor.set_helper(Some(TilesHinter));
 
-    // TODO: Handle "enter" key press or any key press when repl is processing an input
     loop {
         let readline = editor.readline(">>> ");
         let input = match readline {
@@ -298,7 +371,6 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
             }
         };
 
-        // Handle slash commands
         match handle_slash_command(&input, modelname) {
             SlashCommand::Continue => continue,
             SlashCommand::Exit => {
@@ -311,12 +383,9 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
             SlashCommand::NotACommand => {}
         }
 
-        // Skip empty input
         if input.is_empty() {
             continue;
         }
-
-        // Send to model
         let mut remaining_count = run_args.relay_count;
         let mut g_reply: String = "".to_owned();
         let mut python_code: String = "".to_owned();
@@ -358,20 +427,18 @@ async fn ping() -> Result<(), String> {
     }
 }
 
-async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
+async fn load_model(model_name: &str, memory_path: &str) -> Result<()> {
     let client = Client::new();
     let body = json!({
         "model": model_name,
         "memory_path": memory_path
     });
 
-    //TODO: Fix the unwrap here
     let res = client
         .post("http://127.0.0.1:6969/start")
         .json(&body)
         .send()
-        .await
-        .unwrap();
+        .await?;
     match res.status() {
         StatusCode::OK => Ok(()),
         StatusCode::NOT_FOUND => {
@@ -381,16 +448,13 @@ async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
                     println!("\nDownloading completed \n");
                     Ok(())
                 }
-                Err(err) => Err(err),
+                Err(err) => Err(anyhow::anyhow!(format!("Download failed due to {:?}", err))),
             }
         }
-        _ => {
-            println!("err {:?}", res);
-            Err(format!(
-                "Failed to load model {} due to {:?}",
-                model_name, res
-            ))
-        }
+        _ => Err(anyhow::anyhow!(format!(
+            "Failed to load model {} due to {:?}",
+            model_name, res
+        ))),
     }
 }
 
@@ -446,7 +510,6 @@ async fn chat(
 }
 
 fn convert_to_chat_response(content: &str) -> ChatResponse {
-    // content.split()
     ChatResponse {
         reply: extract_reply(content),
         code: extract_python(content),
@@ -470,87 +533,6 @@ fn extract_python(content: &str) -> String {
         list_b[0].to_owned()
     } else {
         "".to_owned()
-    }
-}
-
-// fn extract_think(content: &str) -> String {
-//     if content.contains("<think>") && content.contains("</think>") {
-//         let list_a = content.split("<think>").collect::<Vec<&str>>();
-//         let list_b = list_a[1].split("</think>").collect::<Vec<&str>>();
-//         list_b[0].to_owned()
-//     } else if content.contains("</think") {
-//         let list_a = content.split("</think>").collect::<Vec<&str>>();
-//         list_a[0].to_owned()
-//     } else {
-//         "".to_owned()
-//     }
-// }
-
-fn get_memory_path() -> Result<String> {
-    let tiles_config_dir = get_config_dir()?;
-    let tiles_data_dir = get_data_dir()?;
-    let mut is_memory_path_found: bool = false;
-    let mut memory_path: String = String::from("");
-    if tiles_config_dir.is_dir()
-        && let Ok(content) = fs::read_to_string(tiles_config_dir.join(".memory_path"))
-    {
-        memory_path = content;
-        is_memory_path_found = true;
-    }
-
-    if is_memory_path_found {
-        Ok(memory_path)
-    } else {
-        let memory_path = tiles_data_dir.join("memory");
-        fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
-        fs::create_dir_all(&tiles_config_dir).context("Failed to create tiles config directory")?;
-        fs::write(
-            tiles_config_dir.join(".memory_path"),
-            memory_path.to_str().unwrap(),
-        )
-        .context("Failed to write the default path to .memory_path")?;
-        Ok(memory_path.to_string_lossy().to_string())
-    }
-}
-
-fn get_server_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join("server"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let data_dir = match env::var("XDG_DATA_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".local/share"),
-        };
-        Ok(data_dir.join("tiles/server"))
-    }
-}
-fn get_config_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join(".tiles_dev/tiles"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let config_dir = match env::var("XDG_CONFIG_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".config"),
-        };
-        Ok(config_dir.join("tiles"))
-    }
-}
-
-fn get_data_dir() -> Result<PathBuf> {
-    if cfg!(debug_assertions) {
-        let base_dir = env::current_dir().context("Failed to fetch CURRENT_DIR")?;
-        Ok(base_dir.join(".tiles_dev/tiles"))
-    } else {
-        let home_dir = env::home_dir().context("Failed to fetch $HOME")?;
-        let data_dir = match env::var("XDG_DATA_HOME") {
-            Ok(val) => PathBuf::from(val),
-            Err(_err) => home_dir.join(".local/share"),
-        };
-        Ok(data_dir.join("tiles"))
     }
 }
 

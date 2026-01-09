@@ -22,6 +22,9 @@ enum Commands {
         flags: RunFlags,
     },
 
+    /// Configure your memory
+    Memory(MemoryArgs),
+
     /// Checks the status of dependencies
     Health,
 
@@ -55,6 +58,20 @@ enum ServerCommands {
     /// Stops the daemon py server
     Stop,
 }
+
+#[derive(Debug, Args)]
+#[command(args_conflicts_with_subcommands = true)]
+#[command(flatten_help = true)]
+struct MemoryArgs {
+    #[command(subcommand)]
+    command: MemoryCommands,
+}
+#[derive(Debug, Subcommand)]
+enum MemoryCommands {
+    /// Set Path for the memory
+    SetPath { path: String },
+}
+
 #[tokio::main(flavor = "current_thread")]
 pub async fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
@@ -77,6 +94,9 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             Some(ServerCommands::Start) => commands::start_server(&runtime).await,
             Some(ServerCommands::Stop) => commands::stop_server(&runtime).await,
             _ => println!("Expected start or stop"),
+        },
+        Commands::Memory(memory) => match memory.command {
+            MemoryCommands::SetPath { path } => commands::set_memory(path.as_str()),
         },
     }
     Ok(())
