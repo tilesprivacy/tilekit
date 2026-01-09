@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV="dev" # prod is another env, try taking it from github env
+ENV="prod" # prod is another env, try taking it from github env
 REPO="tilesprivacy/tiles" 
 # VERSION="${TILES_VERSION:-latest}"       
-VERSION="0.3.0"       
+VERSION="0.3.1"       
 INSTALL_DIR="$HOME/.local/bin"           # CLI install location
 SERVER_DIR="$HOME/.local/share/tiles/server"         # Python server folder
 TMPDIR="$(mktemp -d)"

@@ -5,7 +5,7 @@ use tiles::runtime::{RunArgs, build_runtime};
 mod commands;
 #[derive(Debug, Parser)]
 #[command(name = "tiles")]
-#[command(version, about = "Run, fine-tune models locally with Modelfile", long_about = None)]
+#[command(version, about = "Your private AI assistant with offline memory.", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -88,7 +88,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             commands::run(&runtime, run_args).await;
         }
         Commands::Health => {
-            commands::check_health();
+            commands::check_health().await;
         }
         Commands::Server(server) => match server.command {
             Some(ServerCommands::Start) => commands::start_server(&runtime).await,

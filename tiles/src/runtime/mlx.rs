@@ -59,14 +59,9 @@ impl MLXRuntime {
             }
         };
 
-        let model = modelfile.from.as_ref().unwrap();
-        if model.starts_with("driaforall/mem-agent") {
-            let _res = run_model_with_server(self, modelfile, &run_args)
-                .await
-                .inspect_err(|e| eprintln!("Failed to run the model due to {e}"));
-        } else {
-            run_model_by_sub_process(modelfile);
-        }
+        let _res = run_model_with_server(self, modelfile, &run_args)
+            .await
+            .inspect_err(|e| eprintln!("Failed to run the model due to {e}"));
     }
 
     #[allow(clippy::zombie_processes)]
@@ -124,6 +119,7 @@ impl MLXRuntime {
     }
 }
 
+#[allow(dead_code)]
 fn run_model_by_sub_process(modelfile: Modelfile) {
     // build the arg list from modelfile
     let mut args: Vec<String> = vec![];
@@ -417,7 +413,7 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
     }
 }
 
-async fn ping() -> Result<(), String> {
+pub async fn ping() -> Result<(), String> {
     let client = Client::new();
     let res = client.get("http://127.0.0.1:6969/ping").send().await;
 
