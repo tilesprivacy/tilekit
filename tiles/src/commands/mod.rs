@@ -20,8 +20,8 @@ pub fn set_memory(path: &str) {
         }
     }
 }
-pub fn check_health() {
-    health::check_health();
+pub async fn check_health() {
+    health::check_health().await;
 }
 
 pub async fn start_server(runtime: &Runtime) {

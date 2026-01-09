@@ -88,7 +88,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             commands::run(&runtime, run_args).await;
         }
         Commands::Health => {
-            commands::check_health();
+            commands::check_health().await;
         }
         Commands::Server(server) => match server.command {
             Some(ServerCommands::Start) => commands::start_server(&runtime).await,
