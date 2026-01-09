@@ -352,7 +352,7 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
     let config = Config::builder().auto_add_history(true).build();
     let mut editor = Editor::<TilesHinter, DefaultHistory>::with_config(config).unwrap();
     editor.set_helper(Some(TilesHinter));
-
+    let mut g_reply: String = "".to_owned();
     loop {
         let readline = editor.readline(">>> ");
         let input = match readline {
@@ -383,12 +383,13 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
             continue;
         }
         let mut remaining_count = run_args.relay_count;
-        let mut g_reply: String = "".to_owned();
         let mut python_code: String = "".to_owned();
         loop {
             if remaining_count > 0 {
                 let chat_start = remaining_count == run_args.relay_count;
-                if let Ok(response) = chat(&input, modelname, chat_start, &python_code).await {
+                if let Ok(response) =
+                    chat(&input, modelname, chat_start, &python_code, &g_reply).await
+                {
                     if response.reply.is_empty() {
                         if !response.code.is_empty() {
                             python_code = response.code;
@@ -404,6 +405,8 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                     break;
                 }
             } else {
+                // if out of relay count, then clear the global_reply and ready for next fresh prompt
+                g_reply.clear();
                 break;
             }
         }
@@ -459,6 +462,7 @@ async fn chat(
     model_name: &str,
     chat_start: bool,
     python_code: &str,
+    g_reply: &str,
 ) -> Result<ChatResponse, String> {
     let client = Client::new();
 
@@ -467,7 +471,7 @@ async fn chat(
         "chat_start": chat_start,
         "stream": true,
         "python_code": python_code,
-        "messages": [{"role": "user", "content": input}]
+        "messages": [{"role": "assistant", "content": g_reply}, {"role": "user", "content": input}]
     });
     let res = client
         .post("http://127.0.0.1:6969/v1/chat/completions")
