@@ -17,9 +17,7 @@ use rustyline::{Config, Editor, Helper};
 use serde_json::{Value, json};
 use std::fs;
 use std::fs::File;
-use std::path::PathBuf;
 use std::process::Stdio;
-use std::str::FromStr;
 use std::time::Duration;
 use std::{io, process::Command};
 use tilekit::modelfile::Modelfile;
@@ -63,7 +61,9 @@ impl MLXRuntime {
 
         let model = modelfile.from.as_ref().unwrap();
         if model.starts_with("driaforall/mem-agent") {
-            let _res = run_model_with_server(self, modelfile, &run_args).await;
+            let _res = run_model_with_server(self, modelfile, &run_args)
+                .await
+                .inspect_err(|e| eprintln!("Failed to run the model due to {e}"));
         } else {
             run_model_by_sub_process(modelfile);
         }
@@ -274,7 +274,7 @@ async fn run_model_with_server(
     let modelname = modelfile.from.as_ref().unwrap();
     match load_model(modelname, &memory_path).await {
         Ok(_) => start_repl(mlx_runtime, modelname, run_args).await,
-        Err(err) => println!("{}", err),
+        Err(err) => return Err(anyhow::anyhow!(err)),
     }
     Ok(())
 }
@@ -284,24 +284,27 @@ fn get_or_set_memory_path() -> Result<String> {
         Ok(memory_path) => Ok(memory_path),
         Err(_err) => {
             let stdin = io::stdin();
-            let mut default_memory = get_default_memory_path()?;
+            let default_memory_pathbuf = get_default_memory_path()?;
+            let mut default_memory = default_memory_pathbuf
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("Invalid path"))?;
             let mut chose_yes = false;
 
             println!(
                 "{}",
                 format!(
                     "Default Memory location will be set at {:?}\n",
-                    default_memory.to_str().unwrap()
+                    default_memory
                 )
                 .yellow()
             );
-            println!("You can always change the location with `tiles memory set-path <PATH>``\n");
+            println!("You can always change the location with `tiles memory set-path <PATH>`\n");
             println!("Do you want to add a custom memory location right now instead? [Y/N]");
+            let mut input = String::new();
             loop {
-                let mut input = String::new();
-                stdin.read_line(&mut input).unwrap();
+                input.clear();
+                stdin.read_line(&mut input)?;
                 input = input.trim().to_owned();
-                println!("{}", input);
                 if (input == "Y" || input == "y") || chose_yes {
                     if !chose_yes {
                         chose_yes = true;
@@ -310,10 +313,10 @@ fn get_or_set_memory_path() -> Result<String> {
                     }
                     match set_memory_path(input.as_str()) {
                         Ok(msg) => {
-                            default_memory = PathBuf::from_str(input.as_str())?;
+                            default_memory = input.as_str();
                             println!("{}", msg.green());
                             println!(
-                                "You can always change the location with tiles memory set-path <PATH>"
+                                "You can always change the location with `tiles memory set-path <PATH>`\n"
                             );
                             break;
                         }
@@ -326,24 +329,23 @@ fn get_or_set_memory_path() -> Result<String> {
                     }
                 } else {
                     create_default_memory_folder()?;
-                    match set_memory_path(default_memory.to_str().unwrap()) {
+                    match set_memory_path(default_memory) {
                         Ok(msg) => {
                             println!("{}", msg.green());
                             println!(
-                                "You can always change the location with tiles memory set-path <PATH>"
+                                "You can always change the location with `tiles memory set-path <PATH>`\n"
                             );
                             break;
                         }
                         Err(err) => {
                             let error_msg = format!("Error setting memory path due to {:?}", err);
                             println!("{}", error_msg.red());
-                            continue;
+                            return Err(anyhow::anyhow!("Error setting default memory path"));
                         }
                     }
                 }
             }
-            let default_memory_str = default_memory.to_str().unwrap();
-            Ok(default_memory_str.to_owned())
+            Ok(default_memory.to_owned())
         }
     }
 }
@@ -351,12 +353,10 @@ fn get_or_set_memory_path() -> Result<String> {
 async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArgs) {
     println!("Running in interactive mode");
 
-    // Setup rustyline editor with hint support
     let config = Config::builder().auto_add_history(true).build();
     let mut editor = Editor::<TilesHinter, DefaultHistory>::with_config(config).unwrap();
     editor.set_helper(Some(TilesHinter));
 
-    // TODO: Handle "enter" key press or any key press when repl is processing an input
     loop {
         let readline = editor.readline(">>> ");
         let input = match readline {
@@ -371,7 +371,6 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
             }
         };
 
-        // Handle slash commands
         match handle_slash_command(&input, modelname) {
             SlashCommand::Continue => continue,
             SlashCommand::Exit => {
@@ -384,12 +383,9 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
             SlashCommand::NotACommand => {}
         }
 
-        // Skip empty input
         if input.is_empty() {
             continue;
         }
-
-        // Send to model
         let mut remaining_count = run_args.relay_count;
         let mut g_reply: String = "".to_owned();
         let mut python_code: String = "".to_owned();
@@ -431,20 +427,18 @@ async fn ping() -> Result<(), String> {
     }
 }
 
-async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
+async fn load_model(model_name: &str, memory_path: &str) -> Result<()> {
     let client = Client::new();
     let body = json!({
         "model": model_name,
         "memory_path": memory_path
     });
 
-    //TODO: Fix the unwrap here
     let res = client
         .post("http://127.0.0.1:6969/start")
         .json(&body)
         .send()
-        .await
-        .unwrap();
+        .await?;
     match res.status() {
         StatusCode::OK => Ok(()),
         StatusCode::NOT_FOUND => {
@@ -454,16 +448,13 @@ async fn load_model(model_name: &str, memory_path: &str) -> Result<(), String> {
                     println!("\nDownloading completed \n");
                     Ok(())
                 }
-                Err(err) => Err(err),
+                Err(err) => Err(anyhow::anyhow!(format!("Download failed due to {:?}", err))),
             }
         }
-        _ => {
-            println!("err {:?}", res);
-            Err(format!(
-                "Failed to load model {} due to {:?}",
-                model_name, res
-            ))
-        }
+        _ => Err(anyhow::anyhow!(format!(
+            "Failed to load model {} due to {:?}",
+            model_name, res
+        ))),
     }
 }
 
@@ -519,7 +510,6 @@ async fn chat(
 }
 
 fn convert_to_chat_response(content: &str) -> ChatResponse {
-    // content.split()
     ChatResponse {
         reply: extract_reply(content),
         code: extract_python(content),
@@ -545,19 +535,6 @@ fn extract_python(content: &str) -> String {
         "".to_owned()
     }
 }
-
-// fn extract_think(content: &str) -> String {
-//     if content.contains("<think>") && content.contains("</think>") {
-//         let list_a = content.split("<think>").collect::<Vec<&str>>();
-//         let list_b = list_a[1].split("</think>").collect::<Vec<&str>>();
-//         list_b[0].to_owned()
-//     } else if content.contains("</think") {
-//         let list_a = content.split("</think>").collect::<Vec<&str>>();
-//         list_a[0].to_owned()
-//     } else {
-//         "".to_owned()
-//     }
-// }
 
 async fn wait_until_server_is_up() {
     loop {
