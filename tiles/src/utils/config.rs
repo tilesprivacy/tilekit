@@ -32,7 +32,6 @@ pub fn set_memory_path(path: &str) -> Result<String> {
 
 pub fn get_memory_path() -> Result<String> {
     let tiles_config_dir = get_config_dir()?;
-    let tiles_data_dir = get_data_dir()?;
     let mut is_memory_path_found: bool = false;
     let mut memory_path: String = String::from("");
     if tiles_config_dir.is_dir()
@@ -45,16 +44,29 @@ pub fn get_memory_path() -> Result<String> {
     if is_memory_path_found {
         Ok(memory_path)
     } else {
-        let memory_path = tiles_data_dir.join("memory");
-        fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
-        fs::create_dir_all(&tiles_config_dir).context("Failed to create tiles config directory")?;
-        fs::write(
-            tiles_config_dir.join(".memory_path"),
-            memory_path.to_str().unwrap(),
-        )
-        .context("Failed to write the default path to .memory_path")?;
-        Ok(memory_path.to_string_lossy().to_string())
+        Err(anyhow::anyhow!(format!("NOT SET")))
     }
+}
+
+pub fn get_default_memory_path() -> Result<PathBuf> {
+    let tiles_data_dir = get_data_dir()?;
+    // First time access the memory path, time to ask user
+    let memory_path = tiles_data_dir.join("memory");
+    Ok(memory_path)
+    // fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
+    // fs::create_dir_all(&tiles_config_dir).context("Failed to create tiles config directory")?;
+    // fs::write(
+    //     tiles_config_dir.join(".memory_path"),
+    //     memory_path.to_str().unwrap(),
+    // )
+    // .context("Failed to write the default path to .memory_path")?;
+    // Ok(memory_path.to_string_lossy().to_string())
+}
+
+pub fn create_default_memory_folder() -> Result<PathBuf> {
+    let memory_path = get_default_memory_path()?;
+    fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
+    Ok(memory_path)
 }
 
 pub fn get_server_dir() -> Result<PathBuf> {
