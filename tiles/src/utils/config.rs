@@ -50,17 +50,8 @@ pub fn get_memory_path() -> Result<String> {
 
 pub fn get_default_memory_path() -> Result<PathBuf> {
     let tiles_data_dir = get_data_dir()?;
-    // First time access the memory path, time to ask user
     let memory_path = tiles_data_dir.join("memory");
     Ok(memory_path)
-    // fs::create_dir_all(&memory_path).context("Failed to create tiles memory directory")?;
-    // fs::create_dir_all(&tiles_config_dir).context("Failed to create tiles config directory")?;
-    // fs::write(
-    //     tiles_config_dir.join(".memory_path"),
-    //     memory_path.to_str().unwrap(),
-    // )
-    // .context("Failed to write the default path to .memory_path")?;
-    // Ok(memory_path.to_string_lossy().to_string())
 }
 
 pub fn create_default_memory_folder() -> Result<PathBuf> {
