@@ -26,11 +26,6 @@ The SDK is a Modelfile based Rust library that contains all of our model deploym
 
 Define models using a Modelfile, the blueprint for creating and sharing models. Our implementation is optimized for fast, efficient local deployment across consumer platforms, starting with Apple devices.
 
-## Tiles GUI
-> To be released Q1 26.
-
-Use the Local GUI for chats on your laptop. It includes a REST API and an integration for OpenWebUI. The experience will feel familiar to anyone who has used chatbots like ChatGPT or Claude.
-
 ## Download
 
 See the [download page](https://tiles.run/download) on the Tiles website.
@@ -41,7 +36,7 @@ See the [Tiles book](https://tiles.run/book) on the Tiles website.
 
 ## About
 
-Our mission is to shape the future of software personalization with decentralized memory networks.
+Our mission is to bring privacy technology to everyone.
 
 Tiles Privacy was born from the [User & Agents](https://userandagents.com) community with a simple idea: software should understand you without taking anything from you. We strive to deliver the best privacy-focused engineering while also offering unmatched convenience in our consumer products. We believe identity and memory belong together, and Tiles gives you a way to own both through your personal user agent.
 

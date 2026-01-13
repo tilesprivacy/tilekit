@@ -1,38 +1,80 @@
-There are two environments in Tiles: `prod` and `dev`. Follow the instructions below to set up the development environment.
+# HACKING.md
 
-## Building
+This guide will help you set up a reproducible development environment for Tiles. Tiles supports two environments: `prod` (production) and `dev` (development). These instructions assume you are setting up for local development.
 
-1. Clone the repository.
+## Prerequisites
 
-2. Install [`just`](https://github.com/casey/just).
+- [Rust & Cargo](https://www.rust-lang.org/tools/install)
+- [`just`](https://github.com/casey/just) (for task management)
+- [Python 3.8+](https://www.python.org/downloads/)
+- [`uv`](https://docs.astral.sh/uv/) (for fast Python dependency management)
+- [Git](https://git-scm.com/)
 
-3. Set up the Rust environment:
+## Setup Steps
 
-```sh
-cargo build
-```
+1. **Clone the repository:**
 
-4. Install [`uv`](https://docs.astral.sh/uv/) for the Python server.
+   ```sh
+   git clone https://github.com/tilesprivacy/tiles.git
+   cd tiles
+   ```
 
-5. Set up the server:
+2. **Install Rust dependencies:**
 
-```sh
-cd server
-uv sync
-```
+   If you're new to Rust, see [Rust Install Guide](https://www.rust-lang.org/tools/install).
 
-## Running
+   ```sh
+   cargo build
+   ```
 
-1. From the repository root, start the server in one terminal:
+3. **Install project task runner:**
 
-```sh
-just serve
-```
+   [`just`](https://github.com/casey/just) provides easy command shortcuts.
 
-2. In another terminal, run the Rust CLI using Cargo as usual.
+   ```sh
+   cargo install just      # or use your OS package manager
+   ```
 
-```sh
-cd tiles
+4. **Set up the Python server environment:**
 
-cargo run
-```
+   - Make sure [`uv`](https://docs.astral.sh/uv/) is installed:
+
+     ```sh
+     pip install uv
+     ```
+
+   - Sync Python dependencies:
+
+     ```sh
+     cd server
+     uv sync
+     cd ..
+     ```
+
+## Running Tiles (Development)
+
+Open two terminal windows:
+
+1. **Terminal 1: Start the server**
+
+   From the project root:
+
+   ```sh
+   just serve
+   ```
+
+2. **Terminal 2: Run the Rust CLI**
+
+   From the root directory:
+
+   ```sh
+   cargo run --manifest-path tiles/Cargo.toml
+   ```
+
+> **Tip:** Refer to the `justfile` for additional common commands and automation. For troubleshooting, see [CONTRIBUTING.md](CONTRIBUTING.md) and open an issue if you need help.
+
+## Additional Resources
+
+- [Tiles Book](https://tiles.run/book)
+- [Download Page](https://tiles.run/download)
+- [Community & Support](https://go.tiles.run/discord)
