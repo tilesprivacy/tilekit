@@ -132,29 +132,31 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
 
     // 3. Load or Generate Training Data
     let examples = if let Some(path) = data_path {
-        match fs::read_to_string(path) {
-            Ok(c) => {
-                let data: Vec<TrainingExample> = match serde_json::from_str(&c) {
-                    Ok(d) => d,
-                    Err(e) => {
-                        eprintln!("Error parsing data file: {}", e);
-                        vec![]
-                    }
-                };
-                data.into_iter()
-                    .map(|e| {
-                        example! {
-                            "user_input": "input" => e.input,
-                            "ai_response": "output" => e.output,
-                        }
-                    })
-                    .collect()
-            }
+        println!("Loading training data from: {}", path);
+        let content = match fs::read_to_string(&path) {
+            Ok(c) => c,
             Err(e) => {
-                eprintln!("Error reading data file: {}", e);
-                vec![]
+                eprintln!("Error reading data file {}: {}", path, e);
+                return;
             }
-        }
+        };
+
+        let data: Vec<TrainingExample> = match serde_json::from_str(&content) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("Error parsing data file {}: {}", path, e);
+                return;
+            }
+        };
+
+        data.into_iter()
+            .map(|e| {
+                example! {
+                    "user_input": "input" => e.input,
+                    "ai_response": "output" => e.output,
+                }
+            })
+            .collect()
     } else {
         println!("No training data provided. Generating synthetic examples...");
         match generate_synthetic_examples(&system_prompt).await {
