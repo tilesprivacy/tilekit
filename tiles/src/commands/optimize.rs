@@ -34,18 +34,6 @@ pub struct SyntheticDataSignature {
     pub synthetic_data: String,
 }
 
-#[Signature]
-pub struct JudgeSignature {
-    /// Score the AI response from 0.0 to 1.0 based on how well it satisfies the user request while adhering to the system prompt's intent.
-    #[input]
-    pub user_input: String,
-    #[input]
-    pub ai_response: String,
-    #[output]
-    /// A single float value between 0.0 and 1.0.
-    pub score: String,
-}
-
 #[derive(Builder)]
 pub struct PromptOptimizerModule {
     #[builder(default = Predict::new(SystemPromptSignature::new()))]
@@ -67,26 +55,35 @@ impl Optimizable for PromptOptimizerModule {
 }
 
 impl Evaluator for PromptOptimizerModule {
-    async fn metric(&self, example: &Example, prediction: &Prediction) -> f32 {
-        let user_input_field = example.get("user_input", None);
-        let user_input = user_input_field.as_str().unwrap_or("");
-
+    async fn metric(&self, _example: &Example, prediction: &Prediction) -> f32 {
         let ai_response_field = prediction.get("ai_response", None);
         let ai_response = ai_response_field.as_str().unwrap_or("");
 
-        let judge = Predict::new(JudgeSignature::new());
-        let input = example! {
-            "user_input": "input" => user_input.to_string(),
-            "ai_response": "input" => ai_response.to_string(),
-        };
+        let mut score = 0.0;
 
-        if let Ok(res) = judge.forward(input).await {
-            let score_field = res.get("score", None);
-            let score_str = score_field.as_str().unwrap_or("0.0");
-            score_str.trim().parse::<f32>().unwrap_or(0.0)
-        } else {
-            0.0
+        // Reward non-empty responses
+        if !ai_response.is_empty() {
+            score += 0.2;
         }
+
+        // Reward reasonable length (avoid very short or extremely verbose ones)
+        let len = ai_response.len();
+        if len > 50 && len < 1000 {
+            score += 0.3;
+        }
+
+        // Reward structure (presence of newlines or bullet points often indicate better prompts/responses)
+        if ai_response.contains('\n') || ai_response.contains('-') || ai_response.contains('*') {
+            score += 0.2;
+        }
+
+        // Reward persona-like language
+        let lower = ai_response.to_lowercase();
+        if lower.contains("you are") || lower.contains("act as") || lower.contains("assistant") {
+            score += 0.3;
+        }
+
+        score
     }
 }
 
@@ -111,6 +108,12 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
     };
 
     let system_prompt = modelfile.system.clone().unwrap_or_default();
+    if system_prompt.trim().is_empty() {
+        eprintln!(
+            "Error: The Modelfile has an empty SYSTEM prompt. Optimization requires a starting prompt to understand the task objective."
+        );
+        return;
+    }
     println!("Current SYSTEM prompt: \"{}\"", system_prompt);
 
     // 2. Configure DSRs
@@ -173,13 +176,6 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
         "Running COPRO optimizer with {} examples...",
         examples.len()
     );
-
-    if system_prompt.is_empty() {
-        eprintln!(
-            "Error: The Modelfile has an empty SYSTEM prompt. Optimization requires a starting prompt to understand the task objective."
-        );
-        return;
-    }
 
     let mut sig = SystemPromptSignature::new();
     sig.update_instruction(system_prompt).unwrap_or_default();
