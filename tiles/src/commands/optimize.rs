@@ -16,7 +16,7 @@ struct TrainingExample {
 
 #[Signature]
 pub struct SystemPromptSignature {
-    /// Optimize the system prompt for the given task.
+    /// Act as a task-specific assistant based on the instructions provided.
     #[input]
     pub user_input: String,
     #[output]
@@ -25,12 +25,25 @@ pub struct SystemPromptSignature {
 
 #[Signature]
 pub struct SyntheticDataSignature {
-    /// You are a data generator. Given a SYSTEM prompt, generate a JSON array of 5 diverse and representative training examples of user inputs and expected AI responses.
+    /// You are a data generator. Given a SYSTEM prompt, generate a JSON array of 5 diverse and representative training examples.
+    /// Each example must be a JSON object with EXACTLY two fields: "input" (the user's query) and "output" (the expected AI response).
     #[input]
     pub system_prompt: String,
     #[output]
-    /// A JSON array of objects with "input" and "output" fields.
+    /// A JSON array like: [{"input": "...", "output": "..."}, ...]
     pub synthetic_data: String,
+}
+
+#[Signature]
+pub struct JudgeSignature {
+    /// Score the AI response from 0.0 to 1.0 based on how well it satisfies the user request while adhering to the system prompt's intent.
+    #[input]
+    pub user_input: String,
+    #[input]
+    pub ai_response: String,
+    #[output]
+    /// A single float value between 0.0 and 1.0.
+    pub score: String,
 }
 
 #[derive(Builder)]
@@ -54,20 +67,26 @@ impl Optimizable for PromptOptimizerModule {
 }
 
 impl Evaluator for PromptOptimizerModule {
-    async fn metric(&self, _example: &Example, prediction: &Prediction) -> f32 {
-        let response = prediction.get("ai_response", None);
+    async fn metric(&self, example: &Example, prediction: &Prediction) -> f32 {
+        let user_input_field = example.get("user_input", None);
+        let user_input = user_input_field.as_str().unwrap_or("");
 
-        if let Some(s) = response.as_str() {
-            let mut score = 0.0;
-            if !s.is_empty() {
-                score += 0.5;
-            }
-            if s.len() > 20 {
-                score += 0.5;
-            }
-            return score;
+        let ai_response_field = prediction.get("ai_response", None);
+        let ai_response = ai_response_field.as_str().unwrap_or("");
+
+        let judge = Predict::new(JudgeSignature::new());
+        let input = example! {
+            "user_input": "input" => user_input.to_string(),
+            "ai_response": "input" => ai_response.to_string(),
+        };
+
+        if let Ok(res) = judge.forward(input).await {
+            let score_field = res.get("score", None);
+            let score_str = score_field.as_str().unwrap_or("0.0");
+            score_str.trim().parse::<f32>().unwrap_or(0.0)
+        } else {
+            0.0
         }
-        0.0
     }
 }
 
@@ -155,10 +174,15 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
         examples.len()
     );
 
-    let mut sig = SystemPromptSignature::new();
-    if !system_prompt.is_empty() {
-        sig.update_instruction(system_prompt).unwrap_or_default();
+    if system_prompt.is_empty() {
+        eprintln!(
+            "Error: The Modelfile has an empty SYSTEM prompt. Optimization requires a starting prompt to understand the task objective."
+        );
+        return;
     }
+
+    let mut sig = SystemPromptSignature::new();
+    sig.update_instruction(system_prompt).unwrap_or_default();
 
     let mut module = PromptOptimizerModule::builder()
         .predictor(Predict::new(sig))
@@ -179,7 +203,7 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
     println!("New SYSTEM prompt: \n{}", optimized_instructions);
 
     // 5. Update Modelfile
-    modelfile.system = Some(optimized_instructions);
+    modelfile.update_system(&optimized_instructions);
 
     match fs::write(&modelfile_path, modelfile.to_string()) {
         Ok(_) => println!("Successfully updated {}", modelfile_path),
