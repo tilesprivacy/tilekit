@@ -2,19 +2,19 @@ import json
 from typing import Callable, Optional, List, Tuple
 import mlx_lm
 from mlx_lm.tokenizer_utils import TokenizerWrapper, StreamingDetokenizer
-from mlx_engine.cache_wrapper import CacheWrapper
+from ..cache_wrapper import CacheWrapper
 from pathlib import Path
 import mlx.nn as nn
 import mlx.core as mx
 import logging
-from mlx_engine.model_kit.vision_add_ons.base import BaseVisionAddOn
-from mlx_engine.model_kit.vision_add_ons.gemma3 import Gemma3VisionAddOn
-from mlx_engine.model_kit.vision_add_ons.pixtral import PixtralVisionAddOn
-from mlx_engine.model_kit.vision_add_ons.gemma3n import Gemma3nVisionAddOn
-from mlx_engine.model_kit.vision_add_ons.mistral3 import Mistral3VisionAddOn
-from mlx_engine.utils.kv_cache_quantization import get_kv_cache_quantization_params
-from mlx_engine.utils.prompt_processing import process_prompt_text_only
-from mlx_engine.utils.fix_mistral_pre_tokenizer import fix_mistral_pre_tokenizer
+from .vision_add_ons.base import BaseVisionAddOn
+from .vision_add_ons.gemma3 import Gemma3VisionAddOn
+from .vision_add_ons.pixtral import PixtralVisionAddOn
+from .vision_add_ons.gemma3n import Gemma3nVisionAddOn
+from .vision_add_ons.mistral3 import Mistral3VisionAddOn
+from ..utils.kv_cache_quantization import get_kv_cache_quantization_params
+from ..utils.prompt_processing import process_prompt_text_only
+from ..utils.fix_mistral_pre_tokenizer import fix_mistral_pre_tokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ class ModelKit:
                 speculative_decoding_toggle,
                 prompt_progress_callback,
             ), None
-        ### WITH IMAGES PROMPT PROCESSING ###s
+        ### WITH IMAGES PROMPT PROCESSING ###
         if self.vision_add_on is None:
             raise ValueError(
                 "Vision add-on is not loaded, but images were provided for processing"

@@ -38,7 +38,7 @@ class TestLoRA(unittest.TestCase):
                 model_kit = ModelKit(Path("/tmp/fake_model"), adapter_path="/tmp/fake_adapter")
                 
                 mock_mlx_load.assert_called_once()
-                args, kwargs = mock_mlx_load.call_args
+                _, kwargs = mock_mlx_load.call_args
                 self.assertEqual(kwargs.get("adapter_path"), Path("/tmp/fake_adapter"))
                 print("ModelKit LoRA path propagation (ModelKit -> mlx_lm): PASSED")
 

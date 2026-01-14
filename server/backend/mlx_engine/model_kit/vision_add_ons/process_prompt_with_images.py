@@ -4,7 +4,7 @@ from mlx_vlm import prepare_inputs
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 import logging
 
-from mlx_engine.utils.image_utils import convert_to_pil, custom_resize
+from ...utils.image_utils import convert_to_pil, custom_resize
 
 logger = logging.getLogger(__name__)
 

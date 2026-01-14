@@ -13,11 +13,11 @@ from mlx_vlm.models.gemma3 import (
 )
 from mlx_vlm.models.gemma3.gemma3 import Gemma3MultiModalProjector
 
-from mlx_engine.model_kit.vision_add_ons.base import BaseVisionAddOn
-from mlx_engine.model_kit.vision_add_ons.process_prompt_with_images import (
+from .base import BaseVisionAddOn
+from .process_prompt_with_images import (
     common_process_prompt_with_images,
 )
-from mlx_engine.model_kit.vision_add_ons.load_utils import load_vision_addon
+from .load_utils import load_vision_addon
 
 logger = logging.getLogger(__name__)
 

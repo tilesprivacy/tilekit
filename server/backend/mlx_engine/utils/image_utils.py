@@ -57,6 +57,10 @@ def custom_resize(
 
     for i, img in enumerate(pil_images):
         original_width, original_height = img.width, img.height
+        if original_height == 0:
+            logger.warning(f"Image {i+1} has zero height. Skipping resizing.")
+            resized_images.append(img)
+            continue
         aspect_ratio = img.width / img.height
 
         if max_size is not None and (

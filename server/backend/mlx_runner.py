@@ -3,27 +3,27 @@ Enhanced MLX model runner using the vendored mlx_engine.
 Provides ollama-like run experience with streaming and interactive chat.
 """
 
-import sys
+import gc
 import json
+import logging
 import os
+import psutil
 import time
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Dict, Optional, List, Any
+from typing import Any, Dict, List, Optional
 
-# Add current directory to sys.path to support absolute imports in vendored mlx_engine
-sys.path.append(os.path.dirname(__file__))
+import mlx.core as mx
 
-if sys.platform == "darwin":
-    import mlx.core as mx
-else:
-    mx = None
-
-from .mlx_engine import load_model as engine_load_model
 from .mlx_engine import create_generator as engine_create_generator
+from .mlx_engine import load_model as engine_load_model
 from .mlx_engine import tokenize as engine_tokenize
+from .mlx_engine.cache_wrapper import StopPromptProcessing
 
 from ..reasoning_utils import ReasoningExtractor, StreamingReasoningParser
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 
 def get_model_context_length(model_path: str) -> int:
@@ -130,7 +130,6 @@ class MLXRunner:
         self.model_kit = None
         self._model_loaded = False
 
-        import gc
         gc.collect()
         try:
             mx.clear_cache()
@@ -419,12 +418,18 @@ def get_gpu_status() -> Dict[str, float]:
 
 
 def check_memory_available(required_gb: float) -> bool:
-    """Pre-flight check before model loading."""
+    """Pre-flight check before model loading using actual system RAM."""
     try:
-        current_memory = mx.get_active_memory() / 1024**3
-        # Conservative estimate for total memory if not detectable
-        estimated_total = 16.0  # Assume 16GB for modern Macs
-        available = estimated_total - current_memory - 2.0  # 2GB headroom
+        current_memory = mx.get_active_memory() / (1024**3)
+        try:
+            estimated_total_gb = psutil.virtual_memory().total / (1024**3)
+        except Exception:
+            estimated_total_gb = 16.0  # Conservative fallback
+            logger.warning("Could not detect total RAM via psutil, falling back to 16GB.")
+
+        # Calculate available memory with some headroom (2.0 GB)
+        available = estimated_total_gb - current_memory - 2.0
         return available >= required_gb
-    except Exception:
-        return True
+    except Exception as e:
+        logger.warning(f"Error checking memory availability: {e}")
+        return True  # Proceed anyway if check fails

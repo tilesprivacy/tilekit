@@ -1,10 +1,10 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import mlx.core as mx
 from mlx import nn
 
 
-class BaseVisionAddOn:
+class BaseVisionAddOn(ABC):
     """
     Base class that defines the interface for a VisionAddOn.
     """

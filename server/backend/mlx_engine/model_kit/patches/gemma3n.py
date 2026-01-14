@@ -26,10 +26,13 @@ class CompatibleTextConfig(TextConfig):
         config_dict = {
             k: v for k, v in params.items() if k in inspect.signature(cls).parameters
         }
-        if "intermediate_size" in config_dict and isinstance(
-            config_dict["intermediate_size"], list
-        ):
-            config_dict["intermediate_size"] = config_dict["intermediate_size"][0]
+        if "intermediate_size" in config_dict:
+            intermediate_size = config_dict["intermediate_size"]
+            if isinstance(intermediate_size, list):
+                if len(intermediate_size) > 0:
+                    config_dict["intermediate_size"] = intermediate_size[0]
+                else:
+                    config_dict.pop("intermediate_size")
         return cls(**config_dict)
 
 

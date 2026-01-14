@@ -3,7 +3,7 @@ from typing import Optional, Callable
 from mlx import nn
 import mlx.core as mx
 
-from mlx_engine.cache_wrapper import CacheWrapper
+from ..cache_wrapper import CacheWrapper
 
 
 def process_prompt_text_only(

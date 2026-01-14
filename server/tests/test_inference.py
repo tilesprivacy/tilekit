@@ -14,7 +14,7 @@ def test_inference():
     
     try:
         model_path, model_name, commit_hash = get_model_path(model_spec)
-        if not model_path.exists():
+        if model_path is None or not model_path.exists():
             print(f"Error: Model {model_spec} not found in cache. Please download it first.")
             return
 

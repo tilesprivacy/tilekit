@@ -1,6 +1,6 @@
 from typing import Optional
-from mlx_engine.model_kit.model_kit import ModelKit
-from mlx_engine.vision_model_kit.vision_model_kit import VisionModelKit
+from ..model_kit.model_kit import ModelKit
+from ..vision_model_kit.vision_model_kit import VisionModelKit
 
 # Taken from https://github.com/ggml-org/llama.cpp/blob/971f245/src/llama-vocab.cpp#L1807-L1814
 DEFAULT_EOT_TOKENS = [
@@ -67,4 +67,7 @@ def sanitize_eos_tokens(model_kit: ModelKit | VisionModelKit) -> None:
 
     if tokenizer.eos_token_id not in tokenizer.eos_token_ids:
         tokenizer.eos_token_id = min(tokenizer.eos_token_ids)
-        tokenizer._tokenizer.eos_token_id = tokenizer.eos_token_id
+        if hasattr(tokenizer, "_tokenizer") and hasattr(
+            tokenizer._tokenizer, "eos_token_id"
+        ):
+            tokenizer._tokenizer.eos_token_id = tokenizer.eos_token_id

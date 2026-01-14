@@ -2,7 +2,7 @@ from typing import Optional
 import mlx.nn as nn
 import logging
 
-from mlx_engine.model_kit.model_kit import ModelKit
+from ..model_kit.model_kit import ModelKit
 
 logger = logging.getLogger(__name__)
 

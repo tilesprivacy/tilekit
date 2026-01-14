@@ -1,5 +1,5 @@
 from typing import Union, Optional, List, Tuple
-from mlx_engine.model_kit.model_kit import ModelKit
+from ..model_kit.model_kit import ModelKit
 import logging
 
 from ._transformers_compatibility import (
@@ -75,7 +75,7 @@ class VisionModelKit(ModelKit):
             eos_token_ids = (
                 [eos_token_ids_raw]
                 if isinstance(eos_token_ids_raw, int)
-                else list(set(eos_token_ids_raw))
+                else list(dict.fromkeys(eos_token_ids_raw))
             )
             logger.info(f"Setting eos token ids: {eos_token_ids}")
 

@@ -38,7 +38,7 @@ def fix_qwen2_5_vl_image_processor(model_path: Path):
 
 def fix_qwen2_vl_preprocessor(model_path: Path):
     """
-    Remove the `size` entry from the preprocessor_config.json file, which is broken as of transformers 5.50.0
+    Remove the `size` entry from the preprocessor_config.json file, which is broken as of transformers v5.0.0rc2 (release candidate)
     Ref the transformers implementation: https://huggingface.co/Qwen/Qwen2-VL-2B-Instruct/blob/e28f5d3/preprocessor_config.json
     """
     try:

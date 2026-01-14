@@ -4,7 +4,6 @@ from pathlib import Path
 from mlx import nn
 import mlx.core as mx
 
-from mlx_engine.model_kit.vision_add_ons.base import BaseVisionAddOn
 from mlx_vlm.models.mistral3 import (
     VisionModel as Mistral3VisionTower,
     ModelConfig as Mistral3ModelConfig,
@@ -13,10 +12,11 @@ from mlx_vlm.models.mistral3 import (
     Model as Mistral3CombinedModel,
 )
 from mlx_vlm.models.mistral3.mistral3 import Mistral3MultiModalProjector
-from mlx_engine.model_kit.vision_add_ons.process_prompt_with_images import (
+from .base import BaseVisionAddOn
+from .process_prompt_with_images import (
     common_process_prompt_with_images,
 )
-from mlx_engine.model_kit.vision_add_ons.load_utils import load_vision_addon
+from .load_utils import load_vision_addon
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class Mistral3VisionAddOn(BaseVisionAddOn):
         https://github.com/Blaizzy/mlx-vlm/blob/2c3014fd40962bd5320ad611502e7e26cae08926/mlx_vlm/models/mistral3/mistral3.py#L240-L279
         """
 
-        input_ids, pixel_values, attention_mask, other_model_inputs = (
+        input_ids, pixel_values, _, other_model_inputs = (
             common_process_prompt_with_images(
                 prompt_tokens=prompt_tokens,
                 images_b64=images_b64,
@@ -82,7 +82,9 @@ class Mistral3VisionAddOn(BaseVisionAddOn):
         image_sizes = mx.array(image_sizes_list)
 
         if pixel_values is None:
-            return text_model.language_model.model.embed_tokens(input_ids)
+            return input_ids.squeeze(0), text_model.language_model.model.embed_tokens(
+                input_ids
+            ).squeeze(0)
 
         # Get the input embeddings from the language model
         inputs_embeds = text_model.language_model.model.embed_tokens(input_ids)

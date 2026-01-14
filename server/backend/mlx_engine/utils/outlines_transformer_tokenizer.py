@@ -1,5 +1,5 @@
 from outlines.models.transformers import TransformerTokenizer
-from mlx_engine.external.datasets.dill import Hasher
+from ..external.datasets.dill import Hasher
 
 
 class OutlinesTransformerTokenizer(TransformerTokenizer):

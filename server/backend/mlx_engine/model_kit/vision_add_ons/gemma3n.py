@@ -13,11 +13,11 @@ from mlx_vlm.utils import sanitize_weights, load_processor
 import logging
 
 
-from mlx_engine.model_kit.vision_add_ons.base import BaseVisionAddOn
-from mlx_engine.model_kit.vision_add_ons.process_prompt_with_images import (
+from .base import BaseVisionAddOn
+from .process_prompt_with_images import (
     common_process_prompt_with_images,
 )
-from mlx_engine.model_kit.vision_add_ons.load_utils import (
+from .load_utils import (
     load_and_filter_weights,
     load_and_parse_config,
     maybe_apply_quantization,
@@ -71,7 +71,11 @@ class Gemma3nVisionAddOn(BaseVisionAddOn):
             ),
         )
         if self.using_legacy_weights:
-            del components.vision_tower.timm_model.conv_stem.conv.bias
+            try:
+                if hasattr(components.vision_tower, "timm_model"):
+                    del components.vision_tower.timm_model.conv_stem.conv.bias
+            except AttributeError:
+                logger.warning("Could not delete legacy bias: attribute not found")
         processor = load_processor(model_path=model_path, add_detokenizer=True)
         vision_weights = load_and_filter_weights(model_path, components)
         vision_weights = sanitize_weights(

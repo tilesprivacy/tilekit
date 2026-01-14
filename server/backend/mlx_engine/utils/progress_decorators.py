@@ -1,5 +1,5 @@
 from typing import Optional, Callable
-from mlx_engine.cache_wrapper import StopPromptProcessing
+from ..cache_wrapper import StopPromptProcessing
 import logging
 
 logger = logging.getLogger(__name__)
@@ -74,27 +74,27 @@ def throw_to_stop(
 
 def token_count(
     callback: Optional[Callable[[float], bool]],
-) -> Optional[Callable[[int, int], None]]:
+) -> Optional[Callable[[int, int], bool | None]]:
     """
     Adapts a float percentage based progress callback into a token count based one.
 
     Args:
-        outer_callback: A callback that accepts progress (0.0–100.0) and returns
-                        True to continue or False to stop. May be None.
+        callback: A callback that accepts progress (0.0–100.0) and returns
+                  True to continue or False to stop. May be None.
 
     Returns:
-        A token-based callback (processed_tokens, total_tokens) -> None,
+        A token-based callback (processed_tokens, total_tokens) -> bool | None,
         as is expected by mlx-lm's stream_generate.
-        If outer_callback is None, returns None.
+        If callback is None, returns None.
     """
     if callback is None:
         return None
 
-    def inner_callback(processed_tokens: int, total_tokens: int) -> None:
+    def inner_callback(processed_tokens: int, total_tokens: int) -> bool | None:
         if total_tokens <= 0:
             progress = 0.0
         else:
             progress = 100 * processed_tokens / total_tokens
-        callback(progress)
+        return callback(progress)
 
     return inner_callback

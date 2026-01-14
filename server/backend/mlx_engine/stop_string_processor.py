@@ -45,13 +45,13 @@ class StopStringProcessor:
         self.token_id_buffer = []
 
     def process_token(self, token: int) -> StopStringProcessorResult:
-        """Process a new string segment and check how it relates to stop strings.
+        """Process a new token and check how it relates to stop strings.
 
         Args:
-            segment: The new string segment to process
+            token: The new token to process
 
         Returns:
-            StopProcessorResult indicating the state of stop string detection
+            StopStringProcessorResult indicating the state of stop string detection
         """
         if len(self.stop_strings) == 0:
             return StopStringProcessorResult(
@@ -150,16 +150,6 @@ class StopStringProcessor:
             )
         return None
 
-    def check_partial_token_match(
-        self, token_sequence: List[int], stop_token_sequences: List[List[int]]
-    ) -> Optional[_StoppingCriteriaResult]:
-        """Check for partial matches with any stop sequence."""
-        for stop_token_sequence in stop_token_sequences:
-            if self._sequence_overlap(token_sequence, stop_token_sequence):
-                return self._StoppingCriteriaResult(
-                    status="partial_match", stop_string=None
-                )
-        return None
 
     def _check_partial_text_match(
         self, string: str, stop_strings: List[str]

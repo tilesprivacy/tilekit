@@ -7,27 +7,27 @@ import sys
 from mlx_lm.generate import stream_generate
 from mlx_lm.sample_utils import make_sampler
 
-from mlx_engine.model_kit.model_kit import ModelKit
-from mlx_engine.vision_model_kit.vision_model_kit import VisionModelKit
-from mlx_engine.processors.repetition_penalty_processor import (
+from .model_kit.model_kit import ModelKit
+from .vision_model_kit.vision_model_kit import VisionModelKit
+from .processors.repetition_penalty_processor import (
     RepetitionPenaltyProcessor,
 )
-from mlx_engine.utils.token import Token
-from mlx_engine.utils.eot_tokens import sanitize_eos_tokens
-from mlx_engine.utils.top_logprobs import summarize_top_logprobs
-from mlx_engine.stop_string_processor import (
+from .utils.token import Token
+from .utils.eot_tokens import sanitize_eos_tokens
+from .utils.top_logprobs import summarize_top_logprobs
+from .stop_string_processor import (
     StopStringProcessor,
     StopStringProcessorResult,
 )
-from mlx_engine.utils.set_seed import set_seed
-from mlx_engine.utils.speculative_decoding import (
+from .utils.set_seed import set_seed
+from .utils.speculative_decoding import (
     determine_draft_model_for_generation,
     configure_num_draft_tokens_in_generate_args,
 )
 from outlines.processors.structured import JSONLogitsProcessor
-from mlx_engine.utils.outlines_transformer_tokenizer import OutlinesTransformerTokenizer
-from mlx_engine.cache_wrapper import StopPromptProcessing, PROMPT_PROCESSING_CHUNK_SIZE
-from mlx_engine.utils.progress_decorators import ratchet, throw_to_stop, token_count
+from .utils.outlines_transformer_tokenizer import OutlinesTransformerTokenizer
+from .cache_wrapper import StopPromptProcessing, PROMPT_PROCESSING_CHUNK_SIZE
+from .utils.progress_decorators import ratchet, throw_to_stop, token_count
 
 MAX_TOP_LOGPROBS = 10
 

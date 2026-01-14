@@ -1,4 +1,4 @@
-from mlx_engine.utils.token import Token
+from .token import Token
 
 import mlx.core as mx
 
@@ -14,7 +14,7 @@ def summarize_top_logprobs(
 
     # slice the top logprobs
     top_indices = sorted_indices[:top_logprobs]
-    top_logprobs = sorted_logprobs[:top_logprobs]
+    top_logprob_values = sorted_logprobs[:top_logprobs]
 
     # decode the top indices
     text_list = [tokenizer.decode(index) for index in top_indices.tolist()]
@@ -23,6 +23,6 @@ def summarize_top_logprobs(
     return [
         Token(id=int(idx), text=txt, logprob=float(prob))
         for idx, txt, prob in zip(
-            top_indices.tolist(), text_list, top_logprobs.tolist()
+            top_indices.tolist(), text_list, top_logprob_values.tolist()
         )
     ]

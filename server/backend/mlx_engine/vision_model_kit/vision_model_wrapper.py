@@ -3,7 +3,7 @@ import logging
 
 from mlx_vlm.models.cache import KVCache, SimpleKVCache
 from typing import List, Optional
-from mlx_engine.model_kit.vision_add_ons.process_prompt_with_images import (
+from ..model_kit.vision_add_ons.process_prompt_with_images import (
     common_process_prompt_with_images,
 )
 

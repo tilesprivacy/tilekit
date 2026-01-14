@@ -210,7 +210,7 @@ def _save_spacyLanguage(pickler, obj):
 def _save_transformersPreTrainedTokenizerBase(pickler, obj):
     log(pickler, f"Tok: {obj}")
     # Ignore the `cache` attribute
-    state = obj.__dict__
+    state = obj.__dict__.copy()
     if "cache" in state and isinstance(state["cache"], dict):
         state["cache"] = {}
     pickler.save_reduce(type(obj), (), state=state, obj=obj)
