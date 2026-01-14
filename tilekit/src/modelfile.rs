@@ -170,12 +170,38 @@ impl Modelfile {
         if self.system.is_some() {
             let error = "Modelfile can only have one SYSTEM instruction".to_owned();
             self.errors.push(error.clone());
-
-            self.data.push(format!("SYSTEM {}", value));
             Err(error)
         } else {
             self.system = Some(value.to_owned());
+            let formatted = if value.contains('"') {
+                format!("SYSTEM \"\"\"{}\"\"\"", value)
+            } else {
+                format!("SYSTEM \"{}\"", value)
+            };
+            self.data.push(formatted);
             Ok(())
+        }
+    }
+
+    pub fn update_system(&mut self, value: &str) {
+        self.system = Some(value.to_owned());
+        let formatted = if value.contains('"') {
+            format!("SYSTEM \"\"\"{}\"\"\"", value)
+        } else {
+            format!("SYSTEM \"{}\"", value)
+        };
+
+        // Find and replace or add to data
+        let mut found = false;
+        for line in self.data.iter_mut() {
+            if line.to_uppercase().starts_with("SYSTEM") {
+                *line = formatted.clone();
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            self.data.push(formatted);
         }
     }
 

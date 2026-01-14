@@ -15,3 +15,6 @@ owo-colors = "4"
 futures-util = "0.3"
 hf-hub = {version = "0.4", features = ["tokio"]}
 rustyline = "17.0"
+dspy_rs = { package = "dspy-rs", version = "0.7.3" }
+bon = "3.7.0"
+indexmap = "2.2.0"

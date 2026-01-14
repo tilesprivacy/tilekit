@@ -30,6 +30,20 @@ enum Commands {
 
     /// start or stop the daemon server
     Server(ServerArgs),
+
+    /// Optimize the SYSTEM prompt in a Modelfile
+    Optimize {
+        /// Path to the Modelfile to optimize
+        modelfile_path: String,
+
+        /// Path to the training data (JSON)
+        #[arg(short, long)]
+        data: Option<String>,
+
+        /// Model to use for optimization (e.g., openai:gpt-4o-mini, ollama:llama3)
+        #[arg(long, default_value = "openai:gpt-4o-mini")]
+        model: String,
+    },
 }
 
 #[derive(Debug, Args)]
@@ -98,6 +112,13 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         Commands::Memory(memory) => match memory.command {
             MemoryCommands::SetPath { path } => commands::set_memory(path.as_str()),
         },
+        Commands::Optimize {
+            modelfile_path,
+            data,
+            model,
+        } => {
+            commands::optimize(modelfile_path, data, model).await;
+        }
     }
     Ok(())
 }
