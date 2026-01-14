@@ -5,6 +5,7 @@ from ..schemas import ChatMessage, ChatCompletionRequest, downloadRequest, Respo
 from ..hf_downloader import pull_model
 
 import logging
+import asyncio
 import json
 import time
 import uuid
@@ -200,7 +201,8 @@ async def generate_response(request: ResponseRequest) -> Dict[str, Any]:
             # Fallback for json_object type
             json_schema = "{}"
 
-    response_text = runner.generate_batch(
+    response_text = await asyncio.to_thread(
+        runner.generate_batch,
         prompt=prompt,
         max_tokens=runner.get_effective_max_tokens(
             request.max_tokens or _default_max_tokens, interactive=False
@@ -217,10 +219,16 @@ async def generate_response(request: ResponseRequest) -> Dict[str, Any]:
         stop_sequences = (
             request.stop if isinstance(request.stop, list) else [request.stop]
         )
+        min_index = len(response_text)
+        found_stop = False
         for stop in stop_sequences:
-            if stop in response_text:
-                response_text = response_text.split(stop)[0]
-                break
+            index = response_text.find(stop)
+            if index != -1:
+                min_index = min(min_index, index)
+                found_stop = True
+        
+        if found_stop:
+            response_text = response_text[:min_index]
 
     prompt_tokens = count_tokens(prompt)
     completion_tokens = count_tokens(response_text)

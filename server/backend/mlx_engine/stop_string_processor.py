@@ -153,11 +153,11 @@ class StopStringProcessor:
 
     def _check_partial_text_match(
         self, string: str, stop_strings: List[str]
-    ) -> Optional[StopStringProcessorResult]:
+    ) -> Optional[_StoppingCriteriaResult]:
         """Check for partial matches with any stop sequence."""
         for stop_string in stop_strings:
             if self._sequence_overlap(string, stop_string):
-                return StopStringProcessorResult(
+                return self._StoppingCriteriaResult(
                     status="partial_match", stop_string=None
                 )
         return None

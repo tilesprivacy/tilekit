@@ -88,5 +88,5 @@ async def create_response(request: ResponseRequest):
         response = await runtime.backend.generate_response(request)
         return response
     except Exception as e:
-        logger.error(f"Error in generate_response: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error in generate_response")
+        raise HTTPException(status_code=500, detail=str(e)) from e

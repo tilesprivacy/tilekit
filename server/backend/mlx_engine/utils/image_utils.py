@@ -66,15 +66,12 @@ def custom_resize(
         if max_size is not None and (
             img.width > max_size[0] or img.height > max_size[1]
         ):
-            if img.width > img.height:
-                new_width = max_size[0]
-                new_height = int(new_width / aspect_ratio)
-            else:
-                new_height = max_size[1]
-                new_width = int(new_height * aspect_ratio)
+            scale = min(max_size[0] / original_width, max_size[1] / original_height, 1.0)
+            new_width = int(original_width * scale)
+            new_height = int(original_height * scale)
             img = img.resize((new_width, new_height), PIL.Image.LANCZOS)
             logger.info(
-                f"Image {i + 1}: Resized from {original_width}x{original_height} to {img.width}x{img.height}\n",
+                f"Image {i + 1}: Resized from {original_width}x{original_height} to {new_width}x{new_height}\n",
             )
 
         max_width = max(max_width, img.width)

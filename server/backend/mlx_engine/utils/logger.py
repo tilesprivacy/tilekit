@@ -9,11 +9,16 @@ import logging
 import sys
 
 
+class MLXEngineStreamHandler(logging.StreamHandler):
+    """Custom StreamHandler that suppresses errors locally instead of globally."""
+
+    def handleError(self, record):
+        """Swallow handler-specific exceptions."""
+        pass
+
+
 def setup_logging():
     """Setup basic logging configuration for mlx_engine."""
-    # Silence exceptions that happen within the logger
-    logging.raiseExceptions = False
-
     # Configure root logger for mlx_engine
     logger = logging.getLogger("mlx_engine")
     logger.setLevel(logging.INFO)
@@ -22,7 +27,7 @@ def setup_logging():
     logger.handlers.clear()
 
     # Create handler that writes to stderr
-    handler = logging.StreamHandler(sys.stderr)
+    handler = MLXEngineStreamHandler(sys.stderr)
     handler.setLevel(logging.INFO)
 
     # Simple formatter with logger name and level

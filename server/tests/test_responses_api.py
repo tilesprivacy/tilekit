@@ -21,7 +21,7 @@ def test_responses_api():
     try:
         from server.cache_utils import get_model_path
         model_path, _, _ = get_model_path(model_spec)
-        if not model_path.exists():
+        if not model_path or not model_path.exists():
              print(f"Skipping test, model {model_spec} not found in cache.")
              return
              
