@@ -188,7 +188,7 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
             Ok(exs) => exs,
             Err(e) => {
                 eprintln!("Failed to generate synthetic examples: {}", e);
-                vec![]
+                return;
             }
         }
     };

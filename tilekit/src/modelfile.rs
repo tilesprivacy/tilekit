@@ -173,18 +173,23 @@ impl Modelfile {
             Err(error)
         } else {
             self.system = Some(value.to_owned());
-            // Escape double quotes to prevent breaking the Modelfile format
-            let escaped_value = value.replace('"', "\\\"");
-            self.data.push(format!("SYSTEM \"{}\"", escaped_value));
+            let formatted = if value.contains('"') {
+                format!("SYSTEM \"\"\"{}\"\"\"", value)
+            } else {
+                format!("SYSTEM \"{}\"", value)
+            };
+            self.data.push(formatted);
             Ok(())
         }
     }
 
     pub fn update_system(&mut self, value: &str) {
         self.system = Some(value.to_owned());
-        // Escape double quotes to prevent breaking the Modelfile format
-        let escaped_value = value.replace('"', "\\\"");
-        let formatted = format!("SYSTEM \"{}\"", escaped_value);
+        let formatted = if value.contains('"') {
+            format!("SYSTEM \"\"\"{}\"\"\"", value)
+        } else {
+            format!("SYSTEM \"{}\"", value)
+        };
 
         // Find and replace or add to data
         let mut found = false;
