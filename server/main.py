@@ -41,9 +41,9 @@ def get_backend():
     Dynamically choose which backend should be used depending on the OS 
     """
     if sys.platform == "darwin":
-        from .backend import mlx
+        from .backend import mlx_backend
         logger.info("Using MLX backend (MacOs)")
-        return mlx
+        return mlx_backend
     elif sys.platform.startswith("linux"):
         from .backend import linux
         logger.info(f"Using linux backend {sys.platform}")

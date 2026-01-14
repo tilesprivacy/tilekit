@@ -7,6 +7,12 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "mlx-lm",
+    "mlx-vlm",
+    "outlines==1.1.1",
+    "outlines-core==0.1.26",
+    "sentencepiece",
+    "pillow",
+    "transformers",
     "black",
     "huggingface-hub>=0.34.0",
 ]

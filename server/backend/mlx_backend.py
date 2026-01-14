@@ -114,6 +114,15 @@ async def generate_chat_stream(
 
     # Stream tokens
     try:
+        json_schema = None
+        if request.response_format:
+            if request.response_format.get("type") == "json_schema":
+                schema_info = request.response_format.get("json_schema", {})
+                json_schema = json.dumps(schema_info.get("schema", {}))
+            elif request.response_format.get("type") == "json_object":
+                # Fallback for json_object type
+                json_schema = "{}" 
+
         for token in runner.generate_streaming(
             prompt=prompt,
             max_tokens=runner.get_effective_max_tokens(
@@ -124,6 +133,7 @@ async def generate_chat_stream(
             repetition_penalty=request.repetition_penalty,
             use_chat_template=False,  # Already applied in _format_conversation
             use_chat_stop_tokens=False,  # Server mode shouldn't stop on chat markers
+            json_schema=json_schema,
         ):
             chunk_response = {
                 "id": completion_id,
