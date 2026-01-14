@@ -5,6 +5,7 @@ use dspy_rs::{
 };
 use indexmap::IndexMap;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::fs;
 use tilekit::modelfile::Modelfile;
 
@@ -55,32 +56,56 @@ impl Optimizable for PromptOptimizerModule {
 }
 
 impl Evaluator for PromptOptimizerModule {
-    async fn metric(&self, _example: &Example, prediction: &Prediction) -> f32 {
+    async fn metric(&self, example: &Example, prediction: &Prediction) -> f32 {
         let ai_response_field = prediction.get("ai_response", None);
         let ai_response = ai_response_field.as_str().unwrap_or("");
 
+        let ground_truth_field = example.get("ai_response", None);
+        let ground_truth = ground_truth_field.as_str().unwrap_or("");
+
         let mut score = 0.0;
+
+        // 1. Correctness Signal: Similarity to ground truth (Dice coefficient)
+        if !ground_truth.is_empty() {
+            let pred_tokens: HashSet<_> = ai_response.split_whitespace().collect();
+            let gt_tokens: HashSet<_> = ground_truth.split_whitespace().collect();
+
+            if !pred_tokens.is_empty() && !gt_tokens.is_empty() {
+                let intersection = pred_tokens.intersection(&gt_tokens).count();
+                let similarity =
+                    2.0 * (intersection as f32) / ((pred_tokens.len() + gt_tokens.len()) as f32);
+
+                // Boost for exact match
+                if ai_response.trim() == ground_truth.trim() {
+                    score += 0.5;
+                } else {
+                    score += similarity * 0.4;
+                }
+            }
+        }
+
+        // 2. Formatting & Persona Heuristics (weighted lower now that we have ground truth)
 
         // Reward non-empty responses
         if !ai_response.is_empty() {
-            score += 0.2;
+            score += 0.1;
         }
 
-        // Reward reasonable length (avoid very short or extremely verbose ones)
+        // Reward reasonable length
         let len = ai_response.len();
         if len > 50 && len < 1000 {
-            score += 0.3;
+            score += 0.1;
         }
 
         // Reward structure (presence of newlines or bullet points often indicate better prompts/responses)
         if ai_response.contains('\n') || ai_response.contains('-') || ai_response.contains('*') {
-            score += 0.2;
+            score += 0.1;
         }
 
         // Reward persona-like language
         let lower = ai_response.to_lowercase();
         if lower.contains("you are") || lower.contains("act as") || lower.contains("assistant") {
-            score += 0.3;
+            score += 0.2;
         }
 
         score
