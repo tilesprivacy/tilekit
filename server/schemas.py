@@ -28,6 +28,7 @@ class ChatCompletionRequest(BaseModel):
     stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
     repetition_penalty: Optional[float] = 1.1
+    response_format: Optional[Dict[str, Any]] = None
 
 
 class CompletionResponse(BaseModel):
