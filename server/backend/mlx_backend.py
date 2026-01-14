@@ -1,7 +1,7 @@
 from .mlx_runner import MLXRunner
 from ..cache_utils import get_model_path
 from fastapi import HTTPException
-from ..schemas import ChatMessage,  ChatCompletionRequest, downloadRequest
+from ..schemas import ChatMessage, ChatCompletionRequest, downloadRequest, ResponseRequest
 from ..hf_downloader import pull_model
 
 import logging
@@ -177,6 +177,72 @@ async def generate_chat_stream(
 
     yield f"data: {json.dumps(final_response)}\n\n"
     yield "data: [DONE]\n\n"
+
+
+async def generate_response(request: ResponseRequest) -> Dict[str, Any]:
+    """Generate complete non-streaming chat completion response."""
+    completion_id = f"chatcmpl-{uuid.uuid4()}"
+    created = int(time.time())
+    runner = get_or_load_model(request.model)
+
+    # Convert messages to dict format for runner
+    message_dicts = format_chat_messages_for_runner(request.messages)
+
+    # Let the runner format with chat templates
+    prompt = runner._format_conversation(message_dicts, use_chat_template=True)
+
+    json_schema = None
+    if request.response_format:
+        if request.response_format.get("type") == "json_schema":
+            schema_info = request.response_format.get("json_schema", {})
+            json_schema = json.dumps(schema_info.get("schema", {}))
+        elif request.response_format.get("type") == "json_object":
+            # Fallback for json_object type
+            json_schema = "{}"
+
+    response_text = runner.generate_batch(
+        prompt=prompt,
+        max_tokens=runner.get_effective_max_tokens(
+            request.max_tokens or _default_max_tokens, interactive=False
+        ),
+        temperature=request.temperature,
+        top_p=request.top_p,
+        repetition_penalty=request.repetition_penalty,
+        use_chat_template=False,
+        json_schema=json_schema,
+    )
+
+    # Handle stop sequences if provided
+    if request.stop:
+        stop_sequences = (
+            request.stop if isinstance(request.stop, list) else [request.stop]
+        )
+        for stop in stop_sequences:
+            if stop in response_text:
+                response_text = response_text.split(stop)[0]
+                break
+
+    prompt_tokens = count_tokens(prompt)
+    completion_tokens = count_tokens(response_text)
+
+    return {
+        "id": completion_id,
+        "object": "chat.completion",
+        "created": created,
+        "model": request.model,
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": response_text},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+    }
 
 def format_chat_messages_for_runner(
     messages: List[ChatMessage],

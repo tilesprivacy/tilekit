@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 
-from .schemas import ChatMessage,  ChatCompletionRequest, StartRequest, downloadRequest
+from .schemas import ChatMessage, ChatCompletionRequest, StartRequest, downloadRequest, ResponseRequest
 from .config import SYSTEM_PROMPT
 import logging
 import sys
@@ -78,4 +78,15 @@ async def create_chat_completion(request: ChatCompletionRequest):
                 headers={"Cache-Control": "no-cache"},
             )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/v1/responses")
+async def create_response(request: ResponseRequest):
+    """Create a non-streaming completion response."""
+    try:
+        response = await runtime.backend.generate_response(request)
+        return response
+    except Exception as e:
+        logger.error(f"Error in generate_response: {e}")
         raise HTTPException(status_code=500, detail=str(e))
