@@ -178,7 +178,13 @@ pub async fn optimize(modelfile_path: String, data_path: Option<String>, model: 
     );
 
     let mut sig = SystemPromptSignature::new();
-    sig.update_instruction(system_prompt).unwrap_or_default();
+    if let Err(e) = sig.update_instruction(system_prompt.clone()) {
+        eprintln!(
+            "Error setting initial system prompt: {}. Prompt: \"{}\"",
+            e, system_prompt
+        );
+        return;
+    }
 
     let mut module = PromptOptimizerModule::builder()
         .predictor(Predict::new(sig))
