@@ -1,0 +1,14 @@
+[
+  {
+    "input": "Summarize this article: [long text about climate change]",
+    "output": "The article discusses the impact of climate change on biodiversity and suggests mitigation strategies like reforestation."
+  },
+  {
+    "input": "Write a python function to sort a list",
+    "output": "def sort_list(l): return sorted(l)"
+  },
+  {
+    "input": "What is the capital of Japan?",
+    "output": "The capital of Japan is Tokyo."
+  }
+]

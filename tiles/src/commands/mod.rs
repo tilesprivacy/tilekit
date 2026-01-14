@@ -5,6 +5,9 @@ use tiles::runtime::Runtime;
 use tiles::utils::config::set_memory_path;
 use tiles::{core::health, runtime::RunArgs};
 
+pub mod optimize;
+pub use optimize::optimize;
+
 pub async fn run(runtime: &Runtime, run_args: RunArgs) {
     runtime.run(run_args).await;
 }
