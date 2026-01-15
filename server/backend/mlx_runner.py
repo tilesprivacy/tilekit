@@ -206,12 +206,15 @@ class MLXRunner:
         if use_chat_stop_tokens:
             stop_strings.extend(self._get_chat_stop_tokens())
 
-        # Initialize reasoning parser
+        # Initialize reasoning parser - only if hide_reasoning is requested
+        # Otherwise we pass raw tokens for the client to handle channel markers
         reasoning_parser = None
-        model_name = getattr(self.model_kit.tokenizer, "name_or_path", "") or ""
-        model_type = ReasoningExtractor.detect_model_type(str(model_name).lower())
-        if model_type:
-            reasoning_parser = StreamingReasoningParser(model_type, hide_reasoning=hide_reasoning)
+        if hide_reasoning:
+            model_name = getattr(self.model_kit.tokenizer, "name_or_path", "") or ""
+            model_type = ReasoningExtractor.detect_model_type(str(model_name).lower())
+            if model_type:
+                reasoning_parser = StreamingReasoningParser(model_type, hide_reasoning=True)
+
 
         generator = engine_create_generator(
             self.model_kit,

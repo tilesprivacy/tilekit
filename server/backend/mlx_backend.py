@@ -88,10 +88,10 @@ async def generate_chat_stream(
     completion_id = f"chatcmpl-{uuid.uuid4()}"
     created = int(time.time())
     runner = get_or_load_model(request.model)
-    if request.chat_start:
-        _messages.extend(request.messages)
+    
     # Convert messages to dict format for runner
     message_dicts = format_chat_messages_for_runner(_messages)
+
 
     # Let the runner format with chat templates
     prompt = runner._format_conversation(message_dicts, use_chat_template=True)
@@ -251,6 +251,159 @@ async def generate_response(request: ResponseRequest) -> Dict[str, Any]:
             "total_tokens": prompt_tokens + completion_tokens,
         },
     }
+
+
+async def generate_response_stream(
+    request: ResponseRequest,
+) -> AsyncGenerator[str, None]:
+    """Generate streaming response with OpenAI-aligned SSE events.
+    
+    Events emitted:
+    - response.created: Initial response object
+    - response.content_part.delta: Streaming text chunks
+    - response.done: Final response complete
+    """
+    response_id = f"resp-{uuid.uuid4()}"
+    created = int(time.time())
+    runner = get_or_load_model(request.model)
+
+    # Convert messages to dict format for runner
+    message_dicts = format_chat_messages_for_runner(request.messages)
+
+    # Let the runner format with chat templates
+    prompt = runner._format_conversation(message_dicts, use_chat_template=True)
+
+    # Emit response.created event
+    created_event = {
+        "type": "response.created",
+        "response": {
+            "id": response_id,
+            "object": "response",
+            "created_at": created,
+            "model": request.model,
+            "status": "in_progress",
+            "output": [],
+        },
+    }
+    yield f"event: response.created\ndata: {json.dumps(created_event)}\n\n"
+
+    # Emit output_item.added for the message
+    output_item_added = {
+        "type": "response.output_item.added",
+        "output_index": 0,
+        "item": {
+            "id": f"msg-{uuid.uuid4()}",
+            "type": "message",
+            "role": "assistant",
+            "status": "in_progress",
+            "content": [],
+        },
+    }
+    yield f"event: response.output_item.added\ndata: {json.dumps(output_item_added)}\n\n"
+
+    # Emit content_part.added
+    content_part_added = {
+        "type": "response.content_part.added",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {"type": "text", "text": ""},
+    }
+    yield f"event: response.content_part.added\ndata: {json.dumps(content_part_added)}\n\n"
+
+    # Stream tokens
+    accumulated_text = ""
+    try:
+        json_schema = None
+        if request.response_format:
+            if request.response_format.get("type") == "json_schema":
+                schema_info = request.response_format.get("json_schema", {})
+                json_schema = json.dumps(schema_info.get("schema", {}))
+            elif request.response_format.get("type") == "json_object":
+                json_schema = "{}"
+
+        for token in runner.generate_streaming(
+            prompt=prompt,
+            max_tokens=runner.get_effective_max_tokens(
+                request.max_tokens or _default_max_tokens, interactive=False
+            ),
+            temperature=request.temperature,
+            top_p=request.top_p,
+            repetition_penalty=request.repetition_penalty,
+            use_chat_template=False,
+            use_chat_stop_tokens=False,
+            json_schema=json_schema,
+        ):
+            accumulated_text += token
+
+            # Emit content_part.delta
+            delta_event = {
+                "type": "response.content_part.delta",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": {"type": "text_delta", "text": token},
+            }
+            yield f"event: response.content_part.delta\ndata: {json.dumps(delta_event)}\n\n"
+
+            # Check for stop sequences
+            if request.stop:
+                stop_sequences = (
+                    request.stop if isinstance(request.stop, list) else [request.stop]
+                )
+                if any(stop in accumulated_text for stop in stop_sequences):
+                    break
+
+    except Exception as e:
+        error_event = {
+            "type": "error",
+            "error": {"type": "server_error", "message": str(e)},
+        }
+        yield f"event: error\ndata: {json.dumps(error_event)}\n\n"
+        return
+
+    # Emit content_part.done
+    content_part_done = {
+        "type": "response.content_part.done",
+        "output_index": 0,
+        "content_index": 0,
+        "part": {"type": "text", "text": accumulated_text},
+    }
+    yield f"event: response.content_part.done\ndata: {json.dumps(content_part_done)}\n\n"
+
+    # Emit output_item.done
+    output_item_done = {
+        "type": "response.output_item.done",
+        "output_index": 0,
+        "item": {
+            "id": output_item_added["item"]["id"],
+            "type": "message",
+            "role": "assistant",
+            "status": "completed",
+            "content": [{"type": "text", "text": accumulated_text}],
+        },
+    }
+    yield f"event: response.output_item.done\ndata: {json.dumps(output_item_done)}\n\n"
+
+    # Emit response.done
+    prompt_tokens = count_tokens(prompt)
+    completion_tokens = count_tokens(accumulated_text)
+    done_event = {
+        "type": "response.done",
+        "response": {
+            "id": response_id,
+            "object": "response",
+            "created_at": created,
+            "model": request.model,
+            "status": "completed",
+            "output": [output_item_done["item"]],
+            "usage": {
+                "input_tokens": prompt_tokens,
+                "output_tokens": completion_tokens,
+                "total_tokens": prompt_tokens + completion_tokens,
+            },
+        },
+    }
+    yield f"event: response.done\ndata: {json.dumps(done_event)}\n\n"
+
 
 def format_chat_messages_for_runner(
     messages: List[ChatMessage],

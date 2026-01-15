@@ -60,6 +60,8 @@ class ModelInfo(BaseModel):
 class StartRequest(BaseModel):
     model: str
     memory_path: str
+    system_prompt: Optional[str] = None
+
 
 
 class downloadRequest(BaseModel):
@@ -72,9 +74,11 @@ class ResponseRequest(BaseModel):
     max_tokens: Optional[int] = None
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.9
+    stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
     repetition_penalty: Optional[float] = 1.1
     response_format: Optional[Dict[str, Any]] = None
+
 
 
 class ResponseResponse(BaseModel):
