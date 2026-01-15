@@ -412,7 +412,7 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                         remaining_count -= 1;
                     } else {
                         g_reply = response.reply.clone();
-                        println!("\n{}", response.reply.trim());
+                        // Note: Streaming already displays the content, no need to print again
                         break;
                     }
                 } else {
