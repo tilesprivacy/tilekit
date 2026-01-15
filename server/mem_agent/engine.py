@@ -32,6 +32,7 @@ class VenvStackExecutor:
         session_id: str,
         workspace_path: str,
         base_venv_path: Optional[str] = None,
+        use_system_python: bool = False,
     ):
         """Initialize the executor.
         
@@ -39,6 +40,7 @@ class VenvStackExecutor:
             session_id: Unique identifier for this execution session
             workspace_path: Directory the code is allowed to access
             base_venv_path: Optional base path for virtual environments
+            use_system_python: If True, use sys.executable (server env) instead of venv
         """
         self.session_id = session_id
         self.workspace_path = os.path.abspath(workspace_path)
@@ -48,16 +50,18 @@ class VenvStackExecutor:
         self.venv_path = os.path.join(self.base_venv_path, session_id)
         self._session_state: Dict[str, Any] = {}
         self._initialized = False
+        self.use_system_python = use_system_python
         
     def _ensure_venv(self) -> None:
         """Ensure the virtual environment exists."""
-        if self._initialized:
+        if self._initialized or self.use_system_python:
             return
             
         os.makedirs(self.venv_path, exist_ok=True)
         
         # Check if venv already exists
         python_path = os.path.join(self.venv_path, "bin", "python3")
+
         if not os.path.exists(python_path):
             # Create venv using system Python
             subprocess.run(
@@ -130,8 +134,13 @@ class VenvStackExecutor:
         
         self._ensure_venv()
         
-        python_path = os.path.join(self.venv_path, "bin", "python3")
+        if self.use_system_python:
+            python_path = sys.executable
+        else:
+            python_path = os.path.join(self.venv_path, "bin", "python3")
+            
         logger.debug(f"[SANDBOX] Using python at: {python_path}")
+
         
         # Prepare code with state restoration/saving
         wrapped_code = f'''

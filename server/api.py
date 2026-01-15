@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 
 from .schemas import ChatMessage, ChatCompletionRequest, StartRequest, downloadRequest, ResponseRequest
-from .config import SYSTEM_PROMPT
+from .config import SYSTEM_PROMPT, TILES_TRACK
 import logging
 import sys
 from typing import Optional
@@ -59,7 +59,15 @@ async def start_model(request: StartRequest):
     
     # Initialize persistent code executor
     session_id = str(uuid.uuid4())
-    _executor = VenvStackExecutor(session_id=session_id, workspace_path=_memory_path)
+    
+    # Check for insider track regression fix
+    use_system_python = (TILES_TRACK == "insider")
+    _executor = VenvStackExecutor(
+        session_id=session_id, 
+        workspace_path=_memory_path,
+        use_system_python=use_system_python
+    )
+
     
     logger.info(f"Initialized VenvStackExecutor for session {session_id}")
     logger.info(f"{runtime.backend}")
