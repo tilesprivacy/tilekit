@@ -31,7 +31,7 @@ def _run_user_code(
     try:
         # Optional: apply working directory and file access restriction
         if allowed_path:
-            allowed = os.path.abspath(allowed_path)
+            allowed = os.path.realpath(allowed_path)
             try:
                 os.chdir(allowed)  # Change working dir to the allowed_path
             except Exception as e:
@@ -48,7 +48,7 @@ def _run_user_code(
                 path = (
                     file if isinstance(file, str) else getattr(file, "name", str(file))
                 )
-                full_path = os.path.abspath(path if path is not None else "")
+                full_path = os.path.realpath(path if path is not None else "")
                 if not full_path.startswith(allowed):
                     raise PermissionError(
                         f"Access to '{full_path}' is denied by sandbox."
@@ -62,7 +62,7 @@ def _run_user_code(
             orig_remove = os.remove
 
             def secure_remove(path, *args, **kwargs):
-                full_path = os.path.abspath(path)
+                full_path = os.path.realpath(path)
                 if not full_path.startswith(allowed):
                     raise PermissionError(
                         f"Removal of '{full_path}' is denied by sandbox."

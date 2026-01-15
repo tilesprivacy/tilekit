@@ -81,29 +81,38 @@ async def create_chat_completion(request: ChatCompletionRequest):
             logger.debug(f"[CHAT] New message history length: {len(_messages)}")
 
 
-        if request.stream:
-            result = ({}, "")
-            if request.python_code:
-                logger.info(f"[CODE_INTERPRETER] Received code to execute:\n{request.python_code}")
-                
-                # Execute code using the original sandboxed_code approach
-                result = execute_sandboxed_code(
-                    code=request.python_code,
-                    allowed_path=_memory_path,
-                    import_module="server.mem_agent.tools",
-                )
-                logger.info(f"[CODE_INTERPRETER] Execution result: vars={result[0]}, error={result[1]}")
-
-            _messages.append(
-                ChatMessage(role="user", content=format_results(result[0], result[1]))
+        result = ({}, "")
+        if request.python_code:
+            logger.info(f"[CODE] Executing: {request.python_code}")
+            result = execute_sandboxed_code(
+                code=request.python_code,
+                allowed_path=_memory_path,
+                import_module="server.mem_agent.tools",
+                log=True
             )
+            logger.info(f"[CODE] Results: {result}")
 
-            # Streaming response
+        _messages.append(
+            ChatMessage(role="user", content=format_results(result[0], result[1]))
+        )
+
+        if request.stream:
             return StreamingResponse(
                 runtime.backend.generate_chat_stream(_messages, request),
                 media_type="text/plain",
                 headers={"Cache-Control": "no-cache"},
             )
+        else:
+            # Note: We use the existing generate_response_stream but iterate to completion 
+            # or we would need a dedicated generate_chat. For now, we'll keep it simple.
+            # Actually, let's just fix the function name to what exists.
+            # mlx_backend doesn't have a non-streaming ChatCompletion handler yet besides 
+            # generate_response which takes ResponseRequest. 
+            # For now, return a placeholder or implement the simple loop.
+            full_content = ""
+            async for chunk in runtime.backend.generate_chat_stream(_messages, request):
+                full_content += chunk
+            return {"choices": [{"message": {"role": "assistant", "content": full_content}}]}
     except Exception as e:
         logger.exception("[CODE_INTERPRETER] Error in create_chat_completion")
         raise HTTPException(status_code=500, detail=str(e))
