@@ -28,6 +28,7 @@ class ChatCompletionRequest(BaseModel):
     stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
     repetition_penalty: Optional[float] = 1.1
+    response_format: Optional[Dict[str, Any]] = None
 
 
 class CompletionResponse(BaseModel):
@@ -59,7 +60,31 @@ class ModelInfo(BaseModel):
 class StartRequest(BaseModel):
     model: str
     memory_path: str
+    system_prompt: Optional[str] = None
+
 
 
 class downloadRequest(BaseModel):
     model: str
+
+
+class ResponseRequest(BaseModel):
+    model: str
+    messages: List[ChatMessage]
+    max_tokens: Optional[int] = None
+    temperature: Optional[float] = 0.7
+    top_p: Optional[float] = 0.9
+    stream: Optional[bool] = False
+    stop: Optional[Union[str, List[str]]] = None
+    repetition_penalty: Optional[float] = 1.1
+    response_format: Optional[Dict[str, Any]] = None
+
+
+
+class ResponseResponse(BaseModel):
+    id: str
+    object: str = "response"
+    created: int
+    model: str
+    choices: List[Dict[str, Any]]
+    usage: Optional[Dict[str, int]] = None

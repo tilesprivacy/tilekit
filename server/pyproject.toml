@@ -4,12 +4,24 @@ version = "0.1.0"
 description = "Local MLX inference server for the Tiles CLI"
 requires-python = "==3.13.*"
 dependencies = [
-    "fastapi",
-    "uvicorn",
-    "mlx-lm",
-    "black",
-    "huggingface-hub>=0.34.0",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "mlx-lm>=0.21.0",
+    "mlx-vlm>=0.3.0",
+    "outlines>=1.0.0",
+    "outlines-core>=0.1.0",
+    "psutil>=6.0.0",
+    "sentencepiece>=0.2.0",
+    "pillow>=11.0.0",
+    "transformers>=4.48.0",
+    "black>=24.0.0",
+    "huggingface-hub>=0.28.0",
+    "venvstacks>=0.2.0",
+    "openai-harmony>=0.0.1",
+
 ]
+
+
 
 [build-system]
 requires = ["setuptools", "wheel"]

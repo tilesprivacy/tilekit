@@ -17,16 +17,18 @@ use rustyline::{Config, Editor, Helper};
 use serde_json::{Value, json};
 use std::fs;
 use std::fs::File;
-use std::process::Stdio;
+use std::io::{self, Write};
+use std::process::{Command, Stdio};
 use std::time::Duration;
-use std::{io, process::Command};
+
 use tilekit::modelfile::Modelfile;
 use tokio::time::sleep;
 pub struct MLXRuntime {}
 
 impl MLXRuntime {}
 pub struct ChatResponse {
-    // think: String,
+    #[allow(dead_code)]
+    analysis: String,
     reply: String,
     code: String,
 }
@@ -43,12 +45,23 @@ impl MLXRuntime {
     }
 
     pub async fn run(&self, run_args: super::RunArgs) {
-        const DEFAULT_MODELFILE: &str = "FROM driaforall/mem-agent-mlx-4bit";
+        // Track-aware model selection
+        // TILES_TRACK=regular (default): Use gpt-oss model
+        // TILES_TRACK=insider: Use Dria model
+        let default_modelfile = match std::env::var("TILES_TRACK")
+            .unwrap_or_else(|_| "regular".to_string())
+            .to_lowercase()
+            .as_str()
+        {
+            "insider" => "FROM driaforall/mem-agent-mlx-4bit",
+            _ => "FROM mlx-community/gpt-oss-20b-MXFP4-Q4",
+        };
+
         //Parse modelfile
         let modelfile_parse_result = if let Some(modelfile_str) = &run_args.modelfile_path {
             tilekit::modelfile::parse_from_file(modelfile_str.as_str())
         } else {
-            tilekit::modelfile::parse(DEFAULT_MODELFILE)
+            tilekit::modelfile::parse(default_modelfile)
         };
 
         let modelfile = match modelfile_parse_result {
@@ -268,7 +281,9 @@ async fn run_model_with_server(
     // loading the model from mem-agent via daemon server
     let memory_path = get_or_set_memory_path().context("Setting/Retrieving memory_path failed")?;
     let modelname = modelfile.from.as_ref().unwrap();
-    match load_model(modelname, &memory_path).await {
+    // Pass system prompt from modelfile if available
+    let system_prompt = modelfile.system.as_deref();
+    match load_model(modelname, &memory_path, system_prompt).await {
         Ok(_) => start_repl(mlx_runtime, modelname, run_args).await,
         Err(err) => return Err(anyhow::anyhow!(err)),
     }
@@ -397,7 +412,7 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                         remaining_count -= 1;
                     } else {
                         g_reply = response.reply.clone();
-                        println!("\n{}", response.reply.trim());
+                        // Note: Streaming already displays the content, no need to print again
                         break;
                     }
                 } else {
@@ -426,12 +441,21 @@ pub async fn ping() -> Result<(), String> {
     }
 }
 
-async fn load_model(model_name: &str, memory_path: &str) -> Result<()> {
+async fn load_model(
+    model_name: &str,
+    memory_path: &str,
+    system_prompt: Option<&str>,
+) -> Result<()> {
     let client = Client::new();
-    let body = json!({
+    let mut body = json!({
         "model": model_name,
         "memory_path": memory_path
     });
+
+    // Add system_prompt to request if provided
+    if let Some(prompt) = system_prompt {
+        body["system_prompt"] = serde_json::Value::String(prompt.to_string());
+    }
 
     let res = client
         .post("http://127.0.0.1:6969/start")
@@ -478,11 +502,13 @@ async fn chat(
         .json(&body)
         .send()
         .await
-        .unwrap();
+        .map_err(|e| format!("Failed to send chat request: {}", e))?;
 
     let mut stream = res.bytes_stream();
     let mut accumulated = String::new();
-    println!();
+    let mut current_channel = "none";
+    let mut marker_accumulated = String::new();
+
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.unwrap();
         let s = String::from_utf8_lossy(&chunk);
@@ -494,29 +520,136 @@ async fn chat(
             let data = line.trim_start_matches("data: ");
 
             if data == "[DONE]" {
+                println!(); // Extra newline at end
                 return Ok(convert_to_chat_response(&accumulated));
             }
+
             // Parse JSON
-            let v: Value = serde_json::from_str(data).unwrap();
+            let v: Value = match serde_json::from_str(data) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+
             if let Some(delta) = v["choices"][0]["delta"]["content"].as_str() {
                 accumulated.push_str(delta);
-                print!("{}", delta.dimmed());
-                use std::io::Write;
-                std::io::stdout().flush().ok();
+                marker_accumulated.push_str(delta);
+
+                // Handle markers in the stream
+                let mut suppress_token = false;
+
+                if marker_accumulated.contains("<|channel|>analysis<|message|>") {
+                    println!("\n{}", "**[Reasoning]**".bold());
+                    current_channel = "analysis";
+                    marker_accumulated.clear();
+                    suppress_token = true;
+                } else if marker_accumulated.contains("<|channel|>final<|message|>") {
+                    println!("\n{}", "---".dimmed());
+                    println!("{}", "**[Answer]**".bold());
+                    current_channel = "final";
+                    marker_accumulated.clear();
+                    suppress_token = true;
+                } else if marker_accumulated.contains("<|channel|>code<|message|>") {
+                    println!("\n{}", "**[Executing Code]**".bold());
+                    current_channel = "code";
+                    marker_accumulated.clear();
+                    suppress_token = true;
+                } else if marker_accumulated.contains("<|end|>")
+                    || marker_accumulated.contains("<|start|>")
+                {
+                    current_channel = "none";
+                    marker_accumulated.clear();
+                    suppress_token = true;
+                }
+
+                // Extra check for leftover marker parts or legacy markers
+                if delta.contains("<|message|>")
+                    || delta.contains("<|end|>")
+                    || delta.contains("<|channel|>")
+                {
+                    suppress_token = true;
+                }
+
+                // Output content based on channel
+                if !suppress_token {
+                    if current_channel == "analysis" {
+                        print!("{}", delta.dimmed());
+                        io::stdout().flush().ok();
+                    } else if current_channel == "final" {
+                        print!("{}", delta);
+                        io::stdout().flush().ok();
+                    } else if current_channel == "code" {
+                        // We don't necessarily want to stream raw code here if it's messy,
+                        // but it's good for feedback.
+                        print!("{}", delta.cyan());
+                        io::stdout().flush().ok();
+                    } else {
+                        // Fallback for legacy format (mem-agent) - print dimmed
+                        print!("{}", delta.dimmed());
+                        io::stdout().flush().ok();
+                    }
+                }
             }
         }
     }
-    Err(String::from("request failed"))
+
+    if !accumulated.is_empty() {
+        Ok(convert_to_chat_response(&accumulated))
+    } else {
+        Err(String::from("request failed"))
+    }
 }
 
 fn convert_to_chat_response(content: &str) -> ChatResponse {
     ChatResponse {
+        analysis: extract_analysis(content),
         reply: extract_reply(content),
         code: extract_python(content),
     }
 }
 
+fn extract_analysis(content: &str) -> String {
+    // Try gpt-oss format first: <|channel|>analysis<|message|>...
+    if let Some(analysis) = extract_channel_content(content, "analysis") {
+        return analysis;
+    }
+
+    // Fallback to legacy format: <think>...</think>
+    if content.contains("<think>") && content.contains("</think>") {
+        let list_a = content.split("<think>").collect::<Vec<&str>>();
+        let list_b = list_a[1].split("</think>").collect::<Vec<&str>>();
+        list_b[0].to_owned()
+    } else {
+        "".to_owned()
+    }
+}
+
+/// Extract content from a gpt-oss channel marker
+/// Format: <|channel|>channel_name<|message|>content<|end|>
+fn extract_channel_content(content: &str, channel: &str) -> Option<String> {
+    let channel_marker = format!("<|channel|>{}<|message|>", channel);
+    if let Some(start_idx) = content.find(&channel_marker) {
+        let content_start = start_idx + channel_marker.len();
+        let remaining = &content[content_start..];
+
+        // Look for end marker or next channel marker
+        let end_idx = remaining
+            .find("<|end|>")
+            .or_else(|| remaining.find("<|channel|>"))
+            .unwrap_or(remaining.len());
+
+        Some(remaining[..end_idx].trim().to_owned())
+    } else {
+        None
+    }
+}
+
 fn extract_reply(content: &str) -> String {
+    // Try gpt-oss format first: <|channel|>final<|message|>...
+    if let Some(reply) = extract_channel_content(content, "final") {
+        return reply;
+    }
+
+    // Fallback to legacy format: <reply>...</reply>
     if content.contains("<reply>") && content.contains("</reply>") {
         let list_a = content.split("<reply>").collect::<Vec<&str>>();
         let list_b = list_a[1].split("</reply>").collect::<Vec<&str>>();
@@ -527,6 +660,12 @@ fn extract_reply(content: &str) -> String {
 }
 
 fn extract_python(content: &str) -> String {
+    // Try gpt-oss format first: <|channel|>code<|message|>...
+    if let Some(code) = extract_channel_content(content, "code") {
+        return code;
+    }
+
+    // Fallback to legacy format: <python>...</python>
     if content.contains("<python>") && content.contains("</python>") {
         let list_a = content.split("<python>").collect::<Vec<&str>>();
         let list_b = list_a[1].split("</python>").collect::<Vec<&str>>();
@@ -547,5 +686,57 @@ async fn wait_until_server_is_up() {
                 sleep(Duration::from_secs(5)).await;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_channel_content() {
+        let content = "<|channel|>analysis<|message|>This is a test analysis.<|channel|>code<|message|>print('hello')<|channel|>final<|message|>Final answer.";
+
+        assert_eq!(
+            extract_channel_content(content, "analysis").unwrap(),
+            "This is a test analysis."
+        );
+        assert_eq!(
+            extract_channel_content(content, "code").unwrap(),
+            "print('hello')"
+        );
+        assert_eq!(
+            extract_channel_content(content, "final").unwrap(),
+            "Final answer."
+        );
+        assert_eq!(extract_channel_content(content, "nonexistent"), None);
+    }
+
+    #[test]
+    fn test_extract_reply() {
+        // Test gpt-oss format
+        let gpt_oss_content = "<|channel|>final<|message|>Hello world";
+        assert_eq!(extract_reply(gpt_oss_content), "Hello world");
+
+        // Test legacy format
+        let legacy_content = "<reply>Legacy reply</reply>";
+        assert_eq!(extract_reply(legacy_content), "Legacy reply");
+
+        // Test empty
+        assert_eq!(extract_reply("no markers"), "");
+    }
+
+    #[test]
+    fn test_extract_python() {
+        // Test gpt-oss format
+        let gpt_oss_content = "<|channel|>code<|message|>x = 1";
+        assert_eq!(extract_python(gpt_oss_content), "x = 1");
+
+        // Test legacy format
+        let legacy_content = "<python>y = 2</python>";
+        assert_eq!(extract_python(legacy_content), "y = 2");
+
+        // Test empty
+        assert_eq!(extract_python("no markers"), "");
     }
 }
