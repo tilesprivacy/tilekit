@@ -412,7 +412,7 @@ async fn start_repl(mlx_runtime: &MLXRuntime, modelname: &str, run_args: &RunArg
                         remaining_count -= 1;
                     } else {
                         g_reply = response.reply.clone();
-                        // Note: We don't print here anymore because chat() handles the streaming output.
+                        println!("\n{}", response.reply.trim());
                         break;
                     }
                 } else {
@@ -581,6 +581,10 @@ async fn chat(
                         // We don't necessarily want to stream raw code here if it's messy,
                         // but it's good for feedback.
                         print!("{}", delta.cyan());
+                        io::stdout().flush().ok();
+                    } else {
+                        // Fallback for legacy format (mem-agent) - print dimmed
+                        print!("{}", delta.dimmed());
                         io::stdout().flush().ok();
                     }
                 }
