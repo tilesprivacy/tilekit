@@ -41,7 +41,7 @@ def custom_resize(
             images, it returns padded images of uniform size.
 
     Side effects:
-        Writes progress and status messages to sys.stderr.
+        Writes progress and status messages to the module logger (logger.info).
     """
     # Validate max_size parameter
     if max_size is not None:

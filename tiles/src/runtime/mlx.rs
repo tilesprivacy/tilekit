@@ -502,7 +502,7 @@ async fn chat(
         .json(&body)
         .send()
         .await
-        .unwrap();
+        .map_err(|e| format!("Failed to send chat request: {}", e))?;
 
     let mut stream = res.bytes_stream();
     let mut accumulated = String::new();

@@ -48,7 +48,7 @@ def fix_mistral_pre_tokenizer(
     # Fix pre-tokenizer
     try:
         tok = Tokenizer.from_file(str(model_path / "tokenizer.json"))
-        tokenizer._tokenizer._tokenizer.pre_tokenizer = tok.pre_tokenizer
+        tokenizer._tokenizer.backend_tokenizer.pre_tokenizer = tok.pre_tokenizer
     except Exception:
         logger.warning(f"Failed to fix tokenizer: {traceback.format_exc()}.")
         return

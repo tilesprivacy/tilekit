@@ -92,9 +92,9 @@ async def create_chat_completion(request: ChatCompletionRequest):
             )
             logger.info(f"[CODE] Results: {result}")
 
-        _messages.append(
-            ChatMessage(role="user", content=format_results(result[0], result[1]))
-        )
+            _messages.append(
+                ChatMessage(role="user", content=format_results(result[0], result[1]))
+            )
 
         if request.stream:
             return StreamingResponse(
@@ -115,7 +115,7 @@ async def create_chat_completion(request: ChatCompletionRequest):
             return {"choices": [{"message": {"role": "assistant", "content": full_content}}]}
     except Exception as e:
         logger.exception("[CODE_INTERPRETER] Error in create_chat_completion")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 

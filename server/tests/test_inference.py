@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+import pytest
 
 # Add the project root to sys.path
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -13,10 +14,9 @@ def test_inference():
     print(f"Testing inference with model: {model_spec}")
     
     try:
-        model_path, model_name, commit_hash = get_model_path(model_spec)
+        model_path, _model_name, _commit_hash = get_model_path(model_spec)
         if model_path is None or not model_path.exists():
-            print(f"Error: Model {model_spec} not found in cache. Please download it first.")
-            return
+            pytest.skip(f"Model {model_spec} not found in cache. Please download it first.")
 
         runner = MLXRunner(str(model_path), verbose=True)
         

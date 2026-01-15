@@ -124,6 +124,7 @@ async def generate_chat_stream(
                 # Fallback for json_object type
                 json_schema = "{}" 
 
+        accumulated_text = ""
         for token in runner.generate_streaming(
             prompt=prompt,
             max_tokens=runner.get_effective_max_tokens(
@@ -136,6 +137,7 @@ async def generate_chat_stream(
             use_chat_stop_tokens=False,  # Server mode shouldn't stop on chat markers
             json_schema=json_schema,
         ):
+            accumulated_text += token
             chunk_response = {
                 "id": completion_id,
                 "object": "chat.completion.chunk",
@@ -153,7 +155,7 @@ async def generate_chat_stream(
                 stop_sequences = (
                     request.stop if isinstance(request.stop, list) else [request.stop]
                 )
-                if any(stop in token for stop in stop_sequences):
+                if any(stop in accumulated_text for stop in stop_sequences):
                     break
 
     except Exception as e:
@@ -235,7 +237,7 @@ async def generate_response(request: ResponseRequest) -> Dict[str, Any]:
 
     return {
         "id": completion_id,
-        "object": "chat.completion",
+        "object": "response",
         "created": created,
         "model": request.model,
         "choices": [

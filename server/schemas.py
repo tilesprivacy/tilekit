@@ -83,7 +83,7 @@ class ResponseRequest(BaseModel):
 
 class ResponseResponse(BaseModel):
     id: str
-    object: str = "chat.completion"
+    object: str = "response"
     created: int
     model: str
     choices: List[Dict[str, Any]]

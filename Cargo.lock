@@ -1658,7 +1658,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 [[package]]
 name = "openai-harmony"
 version = "0.0.8"
-source = "git+https://github.com/openai/harmony#da2389a4b2daced4f98bda50e9174b35d37e3b1d"
+source = "git+https://github.com/openai/harmony?tag=v0.0.8#ec7606df9e87e3d0a1fec9f50928c1e407f0c438"
 dependencies = [
  "anyhow",
  "base64",
